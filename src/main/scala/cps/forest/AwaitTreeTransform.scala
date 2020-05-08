@@ -10,12 +10,12 @@ import cps.misc._
 trait AwaitTreeTransform[F[_],CT]:
 
   thisTreeTransform: TreeTransformScope[F, CT] =>
-  
-  import qctx.tasty.{_, given _}
+
+  import qctx.tasty._
 
 
   def runAwait(awaitTerm: Term, args: Term): CpsTree =
-      AwaitCpsTree(args, awaitTerm.tpe) 
-      
+      AwaitCpsTree(args, awaitTerm.tpe)
+
 
 

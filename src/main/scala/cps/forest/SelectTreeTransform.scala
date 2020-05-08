@@ -11,9 +11,9 @@ trait SelectTreeTransform[F[_], CT]:
 
   thisScope: TreeTransformScope[F, CT] =>
 
-  import qctx.tasty.{_, given _}
+  import qctx.tasty._
 
-  // case selectTerm @ Select(qualifier,name) 
+  // case selectTerm @ Select(qualifier,name)
   def runSelect( selectTerm: Select ): CpsTree =
      val symbol = selectTerm.symbol
      runRoot(selectTerm.qualifier).applyTerm(_.select(symbol), selectTerm.tpe)
@@ -24,7 +24,7 @@ object SelectTreeTransform:
 
   def run[F[_]:Type,T:Type](using qctx1: QuoteContext)(cpsCtx1: TransformationContext[F,T],
                          selectTerm: qctx1.tasty.Select): CpsExpr[F,T] = {
-                         
+
      val tmpFType = summon[Type[F]]
      val tmpCTType = summon[Type[T]]
      class Bridge(tc:TransformationContext[F,T]) extends
@@ -33,13 +33,13 @@ object SelectTreeTransform:
 
          implicit val fType: quoted.Type[F] = tmpFType
          implicit val ctType: quoted.Type[T] = tmpCTType
-          
+
          def bridge(): CpsExpr[F,T] =
             val origin = selectTerm.asInstanceOf[qctx.tasty.Select]
             runSelect(origin).toResult(cpsCtx.patternCode).asInstanceOf[CpsExpr[F,T]]
-                        
 
-     } 
+
+     }
      (new Bridge(cpsCtx1)).bridge()
   }
 

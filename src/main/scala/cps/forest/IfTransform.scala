@@ -4,18 +4,18 @@ import scala.quoted._
 import scala.quoted.matching._
 
 import cps._
- 
+
 object IfTransform:
 
   /**
    *'''
-   * '{ if ($cond)  $ifTrue  else $ifFalse } 
+   * '{ if ($cond)  $ifTrue  else $ifFalse }
    *'''
    **/
-  def run[F[_]:Type,T:Type](cpsCtx: TransformationContext[F,T], 
+  def run[F[_]:Type,T:Type](cpsCtx: TransformationContext[F,T],
                                cond: Expr[Boolean], ifTrue: Expr[T], ifFalse: Expr[T]
                                )(using qctx: QuoteContext): CpsExpr[F,T] =
-     import qctx.tasty.{_, given _}
+     import qctx.tasty._
      import util._
      import cpsCtx._
      val cR = Async.nestTransform(cond, cpsCtx, "C")
@@ -25,18 +25,18 @@ object IfTransform:
 
      val cnBuild = {
        if (!cR.isAsync)
-         if (!tR.isAsync && !fR.isAsync) 
+         if (!tR.isAsync && !fR.isAsync)
             isAsync = false
             CpsExpr.sync(monad, patternCode)
          else
             CpsExpr.async[F,T](monad,
-                '{ if ($cond) 
+                '{ if ($cond)
                      ${tR.transformed}
-                   else 
+                   else
                      ${fR.transformed} })
-       else // (cR.isAsync) 
+       else // (cR.isAsync)
          def condAsyncExpr() = cR.transformed
-         if (!tR.isAsync && !fR.isAsync) 
+         if (!tR.isAsync && !fR.isAsync)
            CpsExpr.async[F,T](monad,
                     '{ ${monad}.map(
                                  ${condAsyncExpr()}
@@ -45,7 +45,7 @@ object IfTransform:
                                      ${ifTrue}
                                    } else {
                                      ${ifFalse}
-                                   } 
+                                   }
                      )})
          else
            CpsExpr.async[F,T](monad,
@@ -55,11 +55,11 @@ object IfTransform:
                            if (c) {
                               ${tR.transformed}
                            } else {
-                              ${fR.transformed} 
-                           } 
+                              ${fR.transformed}
+                           }
                         )
-                    }) 
+                    })
        }
      cnBuild
-     
+
 

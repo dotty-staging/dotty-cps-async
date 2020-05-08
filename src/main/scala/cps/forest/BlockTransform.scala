@@ -13,10 +13,10 @@ class BlockTransform[F[_]:Type, T:Type](cpsCtx: TransformationContext[F,T]):
 
   import cpsCtx._
 
-  // case Block(prevs,last) 
+  // case Block(prevs,last)
   def run(using qctx: QuoteContext)(prevs: List[qctx.tasty.Statement], last: qctx.tasty.Term): CpsExpr[F,T] =
      val tType = implicitly[Type[T]]
-     import qctx.tasty.{_, given _}
+     import qctx.tasty._
      if (cpsCtx.flags.debugLevel > 10)
         println(s"!!!Block-transform, prevs = $prevs")
         println(s"!!!Block-transform, last = $last")
@@ -30,10 +30,10 @@ class BlockTransform[F[_]:Type, T:Type](cpsCtx: TransformationContext[F,T]):
                 ValDefTransform.fromBlock(using qctx)(cpsCtx.copy(exprMarker=exprMarker+i.toString), v)
               case _ =>
                 DefCpsExpr(using qctx)(cpsCtx.monad,Seq(),d)
-            } 
+            }
           case t: Term =>
             // TODO: rootTransform
-            t.seal match 
+            t.seal match
                 case '{ $p:$tp } =>
                         Async.nestTransform(p, cpsCtx, i.toString)
                 case other =>
@@ -49,7 +49,7 @@ class BlockTransform[F[_]:Type, T:Type](cpsCtx: TransformationContext[F,T]):
      val blockResult = rPrevs.foldRight(rLast)((e,s) => e.append(s))
      // wrap yet in one Expr, to 'seal' (not unroll during append in enclosing block).
      CpsExpr.wrap(blockResult)
-  
+
 
 class DefCpsExpr[F[_]:Type](using qctx: QuoteContext)(
                      monad: Expr[CpsMonad[F]],
@@ -59,7 +59,7 @@ class DefCpsExpr[F[_]:Type](using qctx: QuoteContext)(
   def last(using QuoteContext): Expr[Unit] = '{ () }
 
   def prependExprs(exprs: Seq[ExprTreeGen]): CpsExpr[F,Unit] =
-       if (exprs.isEmpty) 
+       if (exprs.isEmpty)
          this
        else
          new DefCpsExpr(using qctx)(monad,exprs ++: prev,definition)

@@ -5,21 +5,21 @@ import scala.quoted.matching._
 
 import cps._
 import cps.misc._
- 
+
 object AwaitTransformOtherMonad:
 
   /**
    *'''
-   * '{ _root_.cps.await[F,$ftType]($ft) } 
+   * '{ _root_.cps.await[F,$ftType]($ft) }
    *'''
    **/
-  def apply[F[_]:Type,G[_]:Type, T:Type, S:Type](cpsCtx: TransformationContext[F,T], 
+  def apply[F[_]:Type,G[_]:Type, T:Type, S:Type](cpsCtx: TransformationContext[F,T],
                                     gType:  Type[G],
-                                    sType:  Type[S], 
+                                    sType:  Type[S],
                                     gs:Expr[Any])  // should be G[S], but dotty bug.
                                       ( using qctx: QuoteContext): CpsExpr[F,T] =
-                                       
-     import qctx.tasty.{_, given _}
+
+     import qctx.tasty._
      import util._
      import cpsCtx._
      // TODO: think about situation, when ftType != tType.
@@ -34,5 +34,5 @@ object AwaitTransformOtherMonad:
         //CpsExprResult[F,T](patternCode, builder, patternType, true)
         throw MacroError("intersection of different asyc areas is not supported now", patternCode)
      }
-     
+
 

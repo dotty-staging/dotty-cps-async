@@ -11,20 +11,20 @@ trait LambdaTreeTransform[F[_], CT]:
 
   thisScope: TreeTransformScope[F, CT] =>
 
-  import qctx.tasty.{_, given _}
+  import qctx.tasty._
 
   def typeInMonad(tp:Type): Type =
        AppliedType(fType.unseal.tpe, List(tp))
 
-  // case lambdaTree @ Lambda(params,body) 
+  // case lambdaTree @ Lambda(params,body)
   def runLambda(lambdaTerm: Term, params: List[ValDef], expr: Term ): CpsTree =
      if (cpsCtx.flags.debugLevel >= 10)
        println(s"runLambda, lambda=${lambdaTerm.seal.show}")
        println(s"runLambda, expr=$expr")
      val cpsBody = runRoot(expr)
-     val retval = if (cpsBody.isAsync) 
-        // in general, shifted lambda 
-        if (cpsCtx.flags.allowShiftedLambda) 
+     val retval = if (cpsBody.isAsync)
+        // in general, shifted lambda
+        if (cpsCtx.flags.allowShiftedLambda)
             asyncBodyShiftedLambda(lambdaTerm, params, cpsBody)
         else
             throw MacroError("await inside lambda functions without enclosing async block", lambdaTerm.seal)
@@ -40,11 +40,11 @@ trait LambdaTreeTransform[F[_], CT]:
      //       because otherwise it's quite strange why we have such interface in compiler
      val rLambda = Lambda(shiftedType, (x: List[Tree]) => cpsBody.transformed )
      CpsTree.pure(rLambda)
-     
+
 
   def shiftedMethodType(paramNames: List[String], paramTypes:List[Type], otpe: Type): MethodType =
      MethodType(paramNames)(_ => paramTypes, _ => typeInMonad(otpe))
-     
+
 
 
 object LambdaTreeTransform:
@@ -54,7 +54,7 @@ object LambdaTreeTransform:
                          lambdaTerm: qctx1.tasty.Term,
                          params: List[qctx1.tasty.ValDef],
                          expr: qctx1.tasty.Term): CpsExpr[F,T] = {
-                         
+
      val tmpFType = summon[Type[F]]
      val tmpCTType = summon[Type[T]]
      class Bridge(tc:TransformationContext[F,T]) extends
@@ -63,15 +63,15 @@ object LambdaTreeTransform:
 
          implicit val fType: quoted.Type[F] = tmpFType
          implicit val ctType: quoted.Type[T] = tmpCTType
-          
+
          def bridge(): CpsExpr[F,T] =
             val origin = lambdaTerm.asInstanceOf[qctx.tasty.Term]
             val xparams = params.asInstanceOf[List[qctx.tasty.ValDef]]
             val xexpr   = expr.asInstanceOf[qctx.tasty.Term]
             runLambda(origin, xparams, xexpr).toResult(cpsCtx.patternCode).asInstanceOf[CpsExpr[F,T]]
-                        
 
-     } 
+
+     }
      (new Bridge(cpsCtx1)).bridge()
   }
 

@@ -7,7 +7,7 @@ trait CpsTreeScope[F[_], CT] {
 
   cpsTreeScope: TreeTransformScope[F, CT] =>
 
-  import qctx.tasty.{_,given _}
+  import qctx.tasty._
 
   sealed abstract class CpsTree:
 
@@ -42,19 +42,19 @@ trait CpsTreeScope[F[_], CT] {
              CpsExpr.async[F,T](monad, transformed)
 
      def safeSeal(t:Term): Expr[Any] =
-       t.tpe.widen match 
-         case _ : MethodType | _ : PolyType => 
+       t.tpe.widen match
+         case _ : MethodType | _ : PolyType =>
            val etaExpanded = t.etaExpand
            etaExpanded.seal
          case _ => t.seal
-            
+
 
 
   object CpsTree:
 
     def pure(origin:Term): CpsTree = PureCpsTree(origin)
 
-    def impure(transformed:Term, tpe: Type): CpsTree = 
+    def impure(transformed:Term, tpe: Type): CpsTree =
                    AwaitCpsTree(transformed, tpe)
 
 
@@ -72,21 +72,21 @@ trait CpsTreeScope[F[_], CT] {
     def monadMap(f: Term => Term, ntpe: Type): CpsTree =
       PureCpsTree(f(origin))
 
-    //   pure(x).flatMap(f:A=>M[B]) 
+    //   pure(x).flatMap(f:A=>M[B])
     def monadFlatMap(f: Term => Term, ntpe: Type): CpsTree =
       FlatMappedCpsTree(this,f, ntpe)
 
     def otpe: Type = origin.tpe
 
-    def transformed: Term = 
+    def transformed: Term =
           val untpureTerm = cpsCtx.monad.unseal.select(pureSymbol)
           val tpureTerm = untpureTerm.appliedToType(otpe)
           val r = tpureTerm.appliedTo(origin)
           r
-      
+
 
   abstract class AsyncCpsTree extends CpsTree:
-                      
+
     def isAsync = true
 
     def transformed: qctx.tasty.Term
@@ -100,7 +100,7 @@ trait CpsTreeScope[F[_], CT] {
 
 
   class AwaitCpsTree(val transformed: Term, val otpe: Type) extends AsyncCpsTree:
-                     
+
     def applyTerm(f: Term => Term, ntpe: Type): CpsTree =
           AwaitCpsTree(f(transformed), ntpe)
 
@@ -137,10 +137,10 @@ trait CpsTreeScope[F[_], CT] {
           //             (x:${prev.seal}) => ${op('x)}
           //   )
           //}.unseal
-          r 
+          r
     }
 
-      
+
   case class FlatMappedCpsTree(
                       val prev: CpsTree,
                       opm: Term => Term,
@@ -154,7 +154,7 @@ trait CpsTreeScope[F[_], CT] {
           FlatMappedCpsTree(prev, t => f(opm(t)), ntpe)
 
     override def monadFlatMap(f: Term => Term, ntpe: Type): CpsTree =
-          // this.flatMap(f) = prev.flatMap(opm).flatMap(f) 
+          // this.flatMap(f) = prev.flatMap(opm).flatMap(f)
           FlatMappedCpsTree(this,f,ntpe)
 
     def transformed: Term = {
@@ -167,7 +167,7 @@ trait CpsTreeScope[F[_], CT] {
               List(prev.transformed),
               List(
                 Lambda(
-                  MethodType(List("x"))(mt => List(prev.otpe), 
+                  MethodType(List("x"))(mt => List(prev.otpe),
                                         mt => AppliedType(fType.unseal.tpe,List(otpe))),
                   opArgs => opm(opArgs.head.asInstanceOf[Term])
                 )

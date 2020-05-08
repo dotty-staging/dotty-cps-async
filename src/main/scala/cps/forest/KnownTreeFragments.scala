@@ -10,8 +10,8 @@ import cps.misc._
 trait KnownTreeFragments[F[_], CT]:
 
   thisKnownTreeTransform: TreeTransformScope[F, CT] =>
-  
-  import qctx.tasty.{_, given _}
+
+  import qctx.tasty._
 
   lazy val awaitPure = TransformUtil.skipInlined(
                          '{ _root_.cps.await[F,Int](${cpsCtx.monad}.pure(3)) }.unseal)
@@ -27,12 +27,12 @@ trait KnownTreeFragments[F[_], CT]:
                          case _ => None
                        }).get.asInstanceOf[TypeTree]
 
- 
+
   lazy val pureSymbol = TransformUtil.find(awaitPure,
                            { case v@Select(x,m) if m == "pure" => Some(v)
                              case _ => None
                            }).get.symbol
-  
+
 
   lazy val mapSymbol = {
         val mapTmpl = TransformUtil.skipInlined(
@@ -51,12 +51,12 @@ trait KnownTreeFragments[F[_], CT]:
                           '{ ${cpsCtx.monad}.flatMap(${cpsCtx.monad}.pure(3))( x =>
                                                                 ${cpsCtx.monad}.pure(1 + x))  }
                          .unseal)
-     
+
         TransformUtil.find(flatMapTmpl,
                            { case v@Select(x,m) if m == "flatMap" => Some(v)
                              case _ => None
                            }).get.symbol
   }
 
-  
+
 
