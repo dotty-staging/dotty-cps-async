@@ -25,7 +25,7 @@ trait CpsTryMonad[F[_]] extends CpsMonad[F] {
    def restore[A](fa: F[A])(fx:Throwable => F[A]): F[A]
 
    def withAction[A](fa:F[A])(action: =>Unit):F[A] =
-      flatMap(fa){x => 
+      flatMap(fa){x =>
         try{
           action
           pure(x)
@@ -53,11 +53,13 @@ trait CpsAsyncMonad[F[_]] extends CpsTryMonad[F] {
 
 object CpsMonad:
 
-  extension ForComprehensionSyntax on [F[_],T,S](x:F[T])(using m:CpsMonad[F]):
+  given ForComprehensionSyntax as AnyRef:
 
-   def flatMap(f: T=>F[S]): F[S] =
-         m.flatMap(x)(f)
+    extension [F[_],T,S](x:F[T])(using m:CpsMonad[F])
 
-   def map(f: T=>S): F[S] =
-         m.map(x)(f)
+      def flatMap(f: T=>F[S]): F[S] =
+        m.flatMap(x)(f)
+
+      def map(f: T=>S): F[S] =
+        m.map(x)(f)
 
