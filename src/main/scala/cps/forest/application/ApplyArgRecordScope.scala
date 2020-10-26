@@ -164,7 +164,7 @@ trait ApplyArgRecordScope[F[_], CT]:
 
        def append(a: CpsTree): CpsTree = a
 
-       private def createAsyncPartialFunction(from: Type, to: Type, body: Match, params: List[ValDef]): Term =
+       private def createAsyncPartialFunction(from: TypeRepr, to: TypeRepr, body: Match, params: List[ValDef]): Term =
          val toInF = typeInMonad(to)
          val fromType = typeOrBoundsToType(from)
          val matchVar = body.scrutinee
@@ -202,16 +202,16 @@ trait ApplyArgRecordScope[F[_], CT]:
             //Match(inputVal, transformCases(body.cases,Nil,false))
 
          def newCheck(): Term =
-            val mt = MethodType(paramNames)(_ => List(fromType), _ => Type.of[Boolean])
+            val mt = MethodType(paramNames)(_ => List(fromType), _ => TypeRepr.of[Boolean])
             Lambda(mt, args => changeArgs(params,args,newCheckBody(matchVar)))
 
          def newBody():Term =
             val mt = MethodType(paramNames)( _ => List(fromType), _ => toInF)
             createAsyncLambda(mt, params)
 
-         def termCast[E](term: Term, tp:quoted.Type[E]): Expr[E] =
+         def termCast[E](term: Term, tp: Type[E]): Expr[E] =
             // changing to cast trigger https://github.com/lampepfl/dotty/issues/9518
-            //given quoted.Type[E] = tp
+            //given Type[E] = tp
             //term.seal.cast[E]
             term.seal.asInstanceOf[Expr[E]]
 
@@ -322,7 +322,7 @@ trait ApplyArgRecordScope[F[_], CT]:
                            Inferred(transformType(i.tpe))
                  case _ => super.transformTypeTree(tree)
 
-             def transformType(tp: Type)(using ctx: Context): Type =
+             def transformType(tp: TypeRepr)(using ctx: Context): TypeRepr =
                tp match
                  case ConstantType(c) => tp
                  case tref@TermRef(qual, name) =>

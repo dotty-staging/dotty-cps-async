@@ -22,9 +22,9 @@ trait TreeTransformScope[F[_]:Type,CT:Type]
 
    implicit val qctx: QuoteContext
 
-   implicit val fType: quoted.Type[F]
+   implicit val fType: Type[F]
 
-   implicit val ctType: quoted.Type[CT]
+   implicit val ctType: Type[CT]
 
    def posExpr(t: qctx.tasty.Term): Expr[Any] =
        import qctx.tasty._
@@ -45,7 +45,7 @@ trait TreeTransformScope[F[_]:Type,CT:Type]
        import qctx.tasty._
        var rest = terms
        var retval: Option[Expr[Any]] = None
-       while(!retval.isDefined && !rest.isEmpty) 
+       while(!retval.isDefined && !rest.isEmpty)
          val t = rest.head
          rest = rest.tail
          t.tpe.widen match
@@ -58,14 +58,14 @@ trait TreeTransformScope[F[_]:Type,CT:Type]
                    //do nothing
            case _ => retval = Some(t.seal)
        retval.getOrElse(cpsCtx.patternCode)
-         
+
 
 
    def safeShow(t: qctx.tasty.Term): String =
        import qctx.tasty._
-       try 
+       try
          t.seal.show
-       catch 
+       catch
          case ex: Exception =>
             t.toString
 

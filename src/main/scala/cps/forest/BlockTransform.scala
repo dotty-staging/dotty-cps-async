@@ -17,8 +17,8 @@ class BlockTransform[F[_]:Type, T:Type](cpsCtx: TransformationContext[F,T]):
 
      if (cpsCtx.flags.debugLevel >= 10) then
         cpsCtx.log(s"Block transform, last=${last.show}")
-     val tType = summon[Type[T]]
-     val uType = summon[Type[Unit]]
+     val tType = Type[T]
+     val uType = Type[Unit]
      import qctx.tasty._
 
 
@@ -102,7 +102,7 @@ class BlockTransform[F[_]:Type, T:Type](cpsCtx: TransformationContext[F,T]):
      import qctx.tasty._
      ( (cpsCtx.flags.customValueDiscard || cpsCtx.flags.warnValueDiscard)
       &&
-       ( !(t.tpe =:= Type.of[Unit]) && !(t.tpe =:= Type.of[Nothing]) )
+       ( !(t.tpe =:= TypeRepr.of[Unit]) && !(t.tpe =:= TypeRepr.of[Nothing]) )
      )
 
 

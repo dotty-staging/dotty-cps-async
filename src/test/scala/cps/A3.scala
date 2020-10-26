@@ -19,20 +19,20 @@ implicit object MMX extends MM[X] {
 
 object A3 {
 
-  inline def a[F[_],T](x: =>T):F[T] = 
+  inline def a[F[_],T](x: =>T):F[T] =
      ${ A3.aTransform[F,T]('x) }
-  
 
-  def aTransform[F[_]:Type,T:Type](e:Expr[T])(using qctx: QuoteContext):Expr[F[T]] = 
+
+  def aTransform[F[_]:Type,T:Type](e:Expr[T])(using qctx: QuoteContext):Expr[F[T]] =
      // call mmTransform here
-     Expr.summon[MM[F]] match 
+     Expr.summon[MM[F]] match
          case Some(mme) =>  // we have Expr[MM[F]] here, need MM[F]
                          val mm: MM[F] = ???  //   staging not works inside macros.
-                         mm.mmTransform(e) 
-         case None => val msg = s"MM not found for ${summon[Type[F]].show}"
+                         mm.mmTransform(e)
+         case None => val msg = s"MM not found for ${Type[F].show}"
                       throw new RuntimeException(msg)
                       //compiletime.error(msg)
 
 }
 
-  
+

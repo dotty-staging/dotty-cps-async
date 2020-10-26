@@ -4,11 +4,11 @@ trait AsyncTreeShifter[F[_], CT]:
 
    thisTreeTransform: TreeTransformScope[F, CT] =>
 
-   import qctx.tasty.{_, given _}
+   import qctx.tasty._
 
-   
+
    def asyncShift(t:Term, shiftedSymbols:Set[Symbol]):Term =
-    t match 
+    t match
       case Block(stats,last) => Block(stats.map(asyncShiftStatement(_,shiftedSymbols)),
                                       asyncShift(last,shiftedSymbols))
       case If(cond, thenp, elsep) => If(asyncShift(cond, shiftedSymbols),
@@ -23,7 +23,7 @@ trait AsyncTreeShifter[F[_], CT]:
                                              finalizer.map(asyncShift(_,shiftedSymbols)))
       case _ =>
               ???
-  
+
    def asyncShiftStatement(t: Statement, shiftedSymbols: Set[Symbol]):Statement =
     t match
        case x: Definition => asyncShiftDefinition(x, shiftedSymbols)

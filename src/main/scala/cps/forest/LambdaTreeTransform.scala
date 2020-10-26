@@ -10,9 +10,9 @@ trait LambdaTreeTransform[F[_], CT]:
 
   thisScope: TreeTransformScope[F, CT] =>
 
-  import qctx.tasty.{_, given _}
+  import qctx.tasty._
 
-  def typeInMonad(tp:Type): Type =
+  def typeInMonad(tp:TypeRepr): TypeRepr =
        fType.unseal.tpe.appliedTo(tp)
 
   // case lambdaTree @ Lambda(params,body)
@@ -42,7 +42,7 @@ trait LambdaTreeTransform[F[_], CT]:
      CpsTree.pure(rLambda)
 
 
-  def shiftedMethodType(paramNames: List[String], paramTypes:List[Type], otpe: Type): MethodType =
+  def shiftedMethodType(paramNames: List[String], paramTypes:List[TypeRepr], otpe: TypeRepr): MethodType =
      MethodType(paramNames)(_ => paramTypes, _ => typeInMonad(otpe))
 
 
@@ -56,14 +56,14 @@ object LambdaTreeTransform:
                          params: List[qctx1.tasty.ValDef],
                          expr: qctx1.tasty.Term): CpsExpr[F,T] = {
 
-     val tmpFType = summon[Type[F]]
-     val tmpCTType = summon[Type[T]]
+     val tmpFType = Type[F]
+     val tmpCTType = Type[T]
      class Bridge(tc:TransformationContext[F,T]) extends
                                                     TreeTransformScope[F,T]
                                                     with TreeTransformScopeInstance[F,T](tc) {
 
-         implicit val fType: quoted.Type[F] = tmpFType
-         implicit val ctType: quoted.Type[T] = tmpCTType
+         implicit val fType: Type[F] = tmpFType
+         implicit val ctType: Type[T] = tmpCTType
 
          def bridge(): CpsExpr[F,T] =
             val origin = lambdaTerm.asInstanceOf[qctx.tasty.Term]

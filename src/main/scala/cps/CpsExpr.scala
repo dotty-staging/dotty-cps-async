@@ -38,7 +38,7 @@ trait CpsExpr[F[_]:Type,T:Type](monad:Expr[CpsMonad[F]], prev: Seq[ExprTreeGen])
   @Deprecated()
   def asyncMonad: Expr[CpsMonad[F]] = monad
 
-  def tType: Type[T] = summon[Type[T]]
+  def tType: Type[T] = Type[T]
 
   //def pure[A:Type](t: Expr[A])(using QuoteContext): CpsExpr[F,A] =
   //                     CpsExpr.sync(monad, t)

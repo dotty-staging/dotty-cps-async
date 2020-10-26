@@ -42,13 +42,13 @@ object Async {
   /**
    * transform expression and get monad from context.
    **/
-  def transformImpl[F[_]:Type,T:Type](f: Expr[T])(using qctx: QuoteContext): Expr[F[T]] = 
+  def transformImpl[F[_]:Type,T:Type](f: Expr[T])(using qctx: QuoteContext): Expr[F[T]] =
     import qctx.tasty._
     Expr.summon[CpsMonad[F]] match
        case Some(dm) =>
           transformMonad[F,T](f,dm)
        case None =>
-          val ft = summon[quoted.Type[F]]
+          val ft = Type[F]
           report.throwError(s"Can't find async monad for ${ft.show}", f)
 
 
@@ -56,7 +56,7 @@ object Async {
    * transform expression within given monad.  Use this function is you need to force async-transform
    * from other macros
    **/
-  def transformMonad[F[_]:Type,T:Type](f: Expr[T], dm: Expr[CpsMonad[F]])(using qctx: QuoteContext): Expr[F[T]] = 
+  def transformMonad[F[_]:Type,T:Type](f: Expr[T], dm: Expr[CpsMonad[F]])(using qctx: QuoteContext): Expr[F[T]] =
     import qctx.tasty._
     import TransformationContextMarker._
     val flags = adoptFlags(f)
@@ -65,7 +65,7 @@ object Async {
         println(s"before transformed: ${f.show}")
       if (flags.printTree)
         println(s"value: ${f.unseal}")
-      if (flags.debugLevel > 5) 
+      if (flags.debugLevel > 5)
         println(s"customValueDiscard=${flags.customValueDiscard}, warnValueDiscard=${flags.warnValueDiscard}")
       val r = rootTransform[F,T](f,dm,flags,TopLevel,0, None).transformed
       if (flags.printCode)
@@ -79,7 +79,7 @@ object Async {
 
 
   def adoptFlags(f: Expr[_])(using qctx: QuoteContext): AsyncMacroFlags =
-    import qctx.tasty.{_,given _}
+    import qctx.tasty._
     Expr.summon[AsyncMacroFlags] match
       case Some(flagsExpr) =>
         flagsExpr match
@@ -106,15 +106,15 @@ object Async {
 
   def rootTransform[F[_]:Type,T:Type](f: Expr[T], dm:Expr[CpsMonad[F]],
                                       flags: AsyncMacroFlags,
-                                      exprMarker: TransformationContextMarker, 
+                                      exprMarker: TransformationContextMarker,
                                       nesting: Int,
                                       parent: Option[TransformationContext[_,_]])(
                                            using qctx: QuoteContext): CpsExpr[F,T] =
-     val tType = summon[Type[T]]
-     import qctx.tasty.{_, given _}
+     val tType = Type[T]
+     import qctx.tasty._
      import util._
      val cpsCtx = TransformationContext[F,T](f,tType,dm,flags,exprMarker,nesting,parent)
-     f match 
+     f match
          case Const(c) =>   ConstTransform(cpsCtx)
          case '{ if ($cond)  $ifTrue  else $ifFalse } =>
                             IfTransform.run(cpsCtx, cond, ifTrue, ifFalse)
@@ -162,10 +162,10 @@ object Async {
                    printf("fTree:"+fTree)
                    throw MacroError(s"language construction is not supported: ${fTree}", f)
              }
-     
-   
-  def nestTransform[F[_]:Type,T:Type,S:Type](f:Expr[S], 
-                                      cpsCtx: TransformationContext[F,T], 
+
+
+  def nestTransform[F[_]:Type,T:Type,S:Type](f:Expr[S],
+                                      cpsCtx: TransformationContext[F,T],
                                       marker: TransformationContextMarker)(using qctx:QuoteContext):CpsExpr[F,S]=
         rootTransform(f,cpsCtx.monad,
                       cpsCtx.flags,marker,cpsCtx.nesting+1, Some(cpsCtx))

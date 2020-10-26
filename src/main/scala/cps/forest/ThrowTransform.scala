@@ -15,12 +15,12 @@ object ThrowTransform:
   def run[F[_]:Type,T:Type, S<:Throwable:Type](cpsCtx: TransformationContext[F,T],
                                ex: Expr[S]
                                )(using qctx: QuoteContext): CpsExpr[F,T] =
-     import qctx.tasty.{_, given _}
+     import qctx.tasty._
      import util._
      import cpsCtx._
      val cpsEx = Async.nestTransform(ex, cpsCtx, TransformationContextMarker.ThrowException)
 
-     if (cpsCtx.monad.unseal.tpe <:< Type.of[CpsTryMonad[F]])
+     if (cpsCtx.monad.unseal.tpe <:< TypeRepr.of[CpsTryMonad[F]])
        val errorMonad = monad.cast[CpsTryMonad[F]]
        if (!cpsEx.isAsync)
             // TODO: think, mb leave as is...

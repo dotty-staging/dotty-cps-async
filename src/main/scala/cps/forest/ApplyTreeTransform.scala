@@ -129,16 +129,16 @@ trait ApplyTreeTransform[F[_],CT]:
 
 
 
-  def typeOrBoundsToType(x: Type, isHight: Boolean = true): Type =
+  def typeOrBoundsToType(x: TypeRepr, isHight: Boolean = true): TypeRepr =
     x match
       case TypeBounds(low,hight) => if (isHight) hight else low
-      case NoPrefix => if (isHight) Type.of[Any] else Type.of[Nothing]
+      case NoPrefix => if (isHight) TypeRepr.of[Any] else TypeRepr.of[Nothing]
       case _ => x
 
   def shiftedLambdaTypeTree(tpt: TypeTree): TypeTree =
     Inferred(shiftedLambdaType(tpt.tpe))
 
-  def shiftedLambdaType(tpe: Type): Type =
+  def shiftedLambdaType(tpe: TypeRepr): TypeRepr =
     tpe.widen match {
       case MethodType(paramNames, paramTypes, resType) =>
                // currently no support for path-dependend lambdas.
@@ -375,7 +375,7 @@ trait ApplyTreeTransform[F[_],CT]:
           case _ => false
      }
 
-  def findAsyncShift[E:quoted.Type](e:Expr[E]):Option[Expr[AsyncShift[E]]] =
+  def findAsyncShift[E:Type](e:Expr[E]):Option[Expr[AsyncShift[E]]] =
     Expr.summon[AsyncShift[E]]
 
   def findAsyncShiftTerm(e:Term):ImplicitSearchResult =
@@ -388,11 +388,11 @@ trait ApplyTreeTransform[F[_],CT]:
     val tpe = e.tpe.widen
     val objAsyncShift = TypeIdent(Symbol.classSymbol("cps.ObjectAsyncShift")).tpe
     val tpTree = objAsyncShift.appliedTo(tpe)
-    //val tpTree = Type.of[ObjectAsyncShift].appliedTo(tpe).simplified
+    //val tpTree = TypeRepr.of[ObjectAsyncShift].appliedTo(tpe).simplified
     if cpsCtx.flags.debugLevel >= 15 then
       cpsCtx.log(s"searchImplicits: tpTree=$tpTree")
       cpsCtx.log(s"tpe=$tpe")
-      cpsCtx.log(s"Type.of[ObjectAsyncShift]=${Type.of[ObjectAsyncShift]}")
+      cpsCtx.log(s"TypeRepr.of[ObjectAsyncShift]=${TypeRepr.of[ObjectAsyncShift]}")
     searchImplicit(tpTree)
 
 
@@ -489,7 +489,7 @@ trait ApplyTreeTransform[F[_],CT]:
 
   def buildApply(cpsFun: CpsTree, fun: Term,
                  argRecords: Seq[ApplyArgRecord],
-                 applyTpe: Type,
+                 applyTpe: TypeRepr,
                  withAsync: Boolean,
                  withShiftedLambda: Boolean,
                  tails: List[Seq[ApplyArgRecord]]
@@ -538,8 +538,8 @@ object ApplyTreeTransform:
                          args: List[qctx1.tasty.Term]): CpsExpr[F,T] = {
      //val tmpCpsCtx = cpsCtx
      val tmpQctx = qctx1
-     val tmpFtype = summon[Type[F]]
-     val tmpCTtype = summon[Type[T]]
+     val tmpFtype = Type[F]
+     val tmpCTtype = Type[T]
      class Bridge(tc:TransformationContext[F,T]) extends TreeTransformScope[F,T]
                                                     with TreeTransformScopeInstance[F,T](tc) {
 

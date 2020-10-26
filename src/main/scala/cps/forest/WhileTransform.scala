@@ -3,18 +3,18 @@ package cps.forest
 import scala.quoted._
 
 import cps._
- 
+
 object WhileTransform:
 
   /**
    *'''
-   * '{ _root_.cps.await[F,$ftType]($ft) } 
+   * '{ _root_.cps.await[F,$ftType]($ft) }
    *'''
    **/
-  def run[F[_]:Type,T:Type](cpsCtx: TransformationContext[F,T], 
+  def run[F[_]:Type,T:Type](cpsCtx: TransformationContext[F,T],
                                cond: Expr[Boolean], repeat: Expr[Unit]
                                )(using qctx: QuoteContext): CpsExpr[F,T] =
-     import qctx.tasty.{_, given _}
+     import qctx.tasty._
      import util._
      import cpsCtx._
      val cpsCond = Async.nestTransform(cond, cpsCtx, TransformationContextMarker.WhileCond)
@@ -23,14 +23,14 @@ object WhileTransform:
 
      val unitBuilder = {
        if (!cpsCond.isAsync)
-         if (!cpsRepeat.isAsync) 
+         if (!cpsRepeat.isAsync)
             CpsExpr.sync(monad, patternCode)
          else
             CpsExpr.async[F,Unit](monad,
                // TODO: add name to whileFun ?
                '{
                  def _whilefun(): F[Unit] = {
-                   if (${cond}) 
+                   if (${cond})
                      ${cpsRepeat.flatMapIgnore(
                           '{ _whilefun() }
                       ).transformed}
@@ -39,14 +39,14 @@ object WhileTransform:
                  }
                  _whilefun()
                })
-       else // (cpsCond.isAsync) 
+       else // (cpsCond.isAsync)
          if (!cpsRepeat.isAsync) {
             CpsExpr.async[F,Unit](monad,
                '{
                  def _whilefun(): F[Unit] = {
                    ${cpsCond.flatMap[Unit]( '{ c =>
                        if (c) {
-                         $repeat 
+                         $repeat
                          _whilefun()
                        } else {
                          ${monad}.pure(())
@@ -68,7 +68,7 @@ object WhileTransform:
                        } else {
                          ${monad}.pure(())
                        }
-                    }).transformed 
+                    }).transformed
                    }
                  }
                  _whilefun()
@@ -76,5 +76,5 @@ object WhileTransform:
          }
      }
      unitBuilder.asInstanceOf[CpsExpr[F,T]]
-     
+
 
