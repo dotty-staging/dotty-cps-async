@@ -10,7 +10,7 @@ trait SelectTreeTransform[F[_], CT]:
 
   thisScope: TreeTransformScope[F, CT] =>
 
-  import qctx.tasty._
+  import qctx.reflect._
 
   // case selectTerm @ Select(qualifier,name)
   def runSelect( selectTerm: Select ): CpsTree =
@@ -34,7 +34,7 @@ object SelectTreeTransform:
          implicit val ctType: Type[T] = tmpCTType
 
          def bridge(): CpsExpr[F,T] =
-            val origin = selectTerm.asInstanceOf[qctx.tasty.Select]
+            val origin = selectTerm.asInstanceOf[qctx.reflect.Select]
             runSelect(origin).toResult[T]
 
 

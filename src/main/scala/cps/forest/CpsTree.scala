@@ -10,7 +10,7 @@ trait CpsTreeScope[F[_], CT] {
 
   cpsTreeScope: TreeTransformScope[F, CT] =>
 
-  import qctx.tasty._
+  import qctx.reflect._
 
   sealed abstract class CpsTree:
 
@@ -22,7 +22,7 @@ trait CpsTreeScope[F[_], CT] {
 
      def syncOrigin: Option[Term]
 
-     def typeApply(targs: List[qctx.tasty.TypeTree], ntpe: TypeRepr): CpsTree =
+     def typeApply(targs: List[qctx.reflect.TypeTree], ntpe: TypeRepr): CpsTree =
             applyTerm(_.appliedToTypeTrees(targs), ntpe)
 
      def applyTerm(f: Term => Term, ntpe: TypeReprTypeRepr): CpsTree
@@ -77,11 +77,11 @@ trait CpsTreeScope[F[_], CT] {
     def impure(transformed:Term, tpe: TypeRepr): CpsTree =
                    AwaitSyncCpsTree(transformed, tpe.widen)
 
-  case class PureCpsTree(origin: qctx.tasty.Term) extends CpsTree:
+  case class PureCpsTree(origin: qctx.reflect.Term) extends CpsTree:
 
     def isAsync = false
 
-    def typeApply(targs: List[qctx.tasty.TypeTree]) =
+    def typeApply(targs: List[qctx.reflect.TypeTree]) =
                 PureCpsTree(origin.appliedToTypeTrees(targs))
 
     def applyTerm(x: Term => Term, ntpe: TypeRepr): CpsTree =

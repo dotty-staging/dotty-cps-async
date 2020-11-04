@@ -10,12 +10,12 @@ trait TypeApplyTreeTransform[F[_], CT]:
 
   thisScope: TreeTransformScope[F, CT] =>
 
-  import qctx.tasty._
+  import qctx.reflect._
 
   // case TypeApply(fun,targs)
-  def runTypeApply( applyTerm: qctx.tasty.Term,
-                    fun: qctx.tasty.Term,
-                    targs: List[qctx.tasty.TypeTree]): CpsTree =
+  def runTypeApply( applyTerm: qctx.reflect.Term,
+                    fun: qctx.reflect.Term,
+                    targs: List[qctx.reflect.TypeTree]): CpsTree =
      runRoot(fun,TransformationContextMarker.TypeApplyFun).typeApply(targs, applyTerm.tpe)
 
 
@@ -36,9 +36,9 @@ object TypeApplyTreeTransform:
          implicit val ctType: Type[T] = tmpCTType
 
          def bridge(): CpsExpr[F,T] =
-            runTypeApply(applyTerm.asInstanceOf[qctx.tasty.Term],
-                         fun.asInstanceOf[qctx.tasty.Term],
-                         targs.asInstanceOf[List[qctx.tasty.TypeTree]]
+            runTypeApply(applyTerm.asInstanceOf[qctx.reflect.Term],
+                         fun.asInstanceOf[qctx.reflect.Term],
+                         targs.asInstanceOf[List[qctx.reflect.TypeTree]]
                         ).toResult[T].asInstanceOf[CpsExpr[F,T]]
 
      }

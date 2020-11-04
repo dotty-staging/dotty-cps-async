@@ -9,16 +9,16 @@ import cps.misc._
 trait RootTreeTransform[F[_], CT]:
 
   thisTransform: TreeTransformScope[F, CT] =>
-  
-  import qctx.tasty._
 
-  def runRoot(term: qctx.tasty.Term, marker: TransformationContextMarker): CpsTree =
+  import qctx.reflect._
+
+  def runRoot(term: qctx.reflect.Term, marker: TransformationContextMarker): CpsTree =
      if (cpsCtx.flags.debugLevel >= 15)
         cpsCtx.log(s"runRoot: term=$safeShow(term)")
      val r = term.tpe.widen match {
        case _ : MethodType =>
                //  in such case, we can't transform tree to expr
-               //  without eta-expansion.  
+               //  without eta-expansion.
                //    from other side - we don't want do eta-expand now, it can be performed early.
                 runRootUneta(term, marker)
        case _ : PolyType =>
@@ -44,16 +44,16 @@ trait RootTreeTransform[F[_], CT]:
      r
 
 
-  def runRootUneta(term: qctx.tasty.Term, marker: TransformationContextMarker): CpsTree = {
+  def runRootUneta(term: qctx.reflect.Term, marker: TransformationContextMarker): CpsTree = {
      // TODO: change cpsCtx to show nesting
      if (cpsCtx.flags.debugLevel >= 15)
         cpsCtx.log(s"runRootUneta, term=$term")
      val monad = cpsCtx.monad
      val r = term match {
        case Select(qual, name) =>
-           runRoot(qual, TransformationContextMarker.Select) match 
+           runRoot(qual, TransformationContextMarker.Select) match
               case rq: AsyncCpsTree =>
-                  val cTransformed = rq.transformed.asInstanceOf[qctx.tasty.Term]
+                  val cTransformed = rq.transformed.asInstanceOf[qctx.reflect.Term]
                   CpsTree.impure(Select(cTransformed,term.symbol),term.tpe)
               case _: PureCpsTree =>
                   CpsTree.pure(term)
@@ -68,9 +68,9 @@ trait RootTreeTransform[F[_], CT]:
                 override val fType = thisScope.fType
                 override val ctType = thisScope.ctType
              }
-             nestScope.runApply(term.asInstanceOf[nestScope.qctx.tasty.Term],
-                                x.asInstanceOf[nestScope.qctx.tasty.Term],
-                                args.asInstanceOf[List[nestScope.qctx.tasty.Term]],
+             nestScope.runApply(term.asInstanceOf[nestScope.qctx.reflect.Term],
+                                x.asInstanceOf[nestScope.qctx.reflect.Term],
+                                args.asInstanceOf[List[nestScope.qctx.reflect.Term]],
                                 Nil).asInstanceOf[CpsTree]
        case _ =>
              throw MacroError(s"cps tree transform is not supported yet to ${term}",cpsCtx.patternCode)

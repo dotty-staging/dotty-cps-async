@@ -10,7 +10,7 @@ trait LambdaTreeTransform[F[_], CT]:
 
   thisScope: TreeTransformScope[F, CT] =>
 
-  import qctx.tasty._
+  import qctx.reflect._
 
   def typeInMonad(tp:TypeRepr): TypeRepr =
        fType.unseal.tpe.appliedTo(tp)
@@ -66,9 +66,9 @@ object LambdaTreeTransform:
          implicit val ctType: Type[T] = tmpCTType
 
          def bridge(): CpsExpr[F,T] =
-            val origin = lambdaTerm.asInstanceOf[qctx.tasty.Term]
-            val xparams = params.asInstanceOf[List[qctx.tasty.ValDef]]
-            val xexpr   = expr.asInstanceOf[qctx.tasty.Term]
+            val origin = lambdaTerm.asInstanceOf[qctx.reflect.Term]
+            val xparams = params.asInstanceOf[List[qctx.reflect.ValDef]]
+            val xexpr   = expr.asInstanceOf[qctx.reflect.Term]
             runLambda(origin, xparams, xexpr).toResult[T]
 
 
