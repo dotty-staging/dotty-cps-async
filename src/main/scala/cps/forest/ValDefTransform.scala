@@ -83,11 +83,10 @@ object ValDefTransform:
 
 
        private def buildAppendBlock(using qctx:QuoteContext)(
-                      oldValDef: qctx.reflect.ValDef, rhqctx.reflectlect.Term,
-                                                    exprTerm:qctx.reflect.Term)qctx.reflectlect.Term =
+                      oldValDef: qctx.reflect.ValDef, rhs: qctx.reflect.Term,
+                                                    exprTerm:qctx.reflect.Term): qctx.reflect.Term =
        {
           import qctx.reflect._
-          import scala.internal.quoted.showName
           import scala.quoted.QuoteContext
           import scala.quoted.Expr
 
@@ -100,7 +99,7 @@ object ValDefTransform:
 
        }
 
-       private def buildAppendBlockExpr[A:Type](using qctx: QuoteContext)(oldValDef: qctx.reflect.ValDef, rhsqctx.reflectlect.Term, expr:Expr[A]):Expr[A] =
+       private def buildAppendBlockExpr[A:Type](using qctx: QuoteContext)(oldValDef: qctx.reflect.ValDef, rhs: qctx.reflect.Term, expr:Expr[A]):Expr[A] =
           import qctx.reflect._
           buildAppendBlock(oldValDef,rhs,expr.unseal).seal.cast[A]
 
@@ -155,7 +154,7 @@ object ValDefTransform:
                                          next.append(e))
 
 
-       def prependPrev(using qctx:QuoteContext)(term: qctx.reflect.Term)qctx.reflectlect.Term =
+       def prependPrev(using qctx:QuoteContext)(term: qctx.reflect.Term): qctx.reflect.Term =
           import qctx.reflect._
           if (prev.isEmpty) {
              term
@@ -166,5 +165,4 @@ object ValDefTransform:
                case other =>
                  Block(prev.toList.map(_.extract) , other)
           }
-
 

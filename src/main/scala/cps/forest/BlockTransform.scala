@@ -27,7 +27,7 @@ class BlockTransform[F[_]:Type, T:Type](cpsCtx: TransformationContext[F,T]):
          case d: Definition =>
            d match {
              case v@ValDef(vName,vtt,optRhs) =>
-               val valDefExpr = Block(List(v),Literal(Constant(()))).seal.cast[Unit]
+               val valDefExpr = Block(List(v),Literal(Constant.Unit())).seal.cast[Unit]
                val nestCtx = cpsCtx.nest(valDefExpr, uType,
                                          TransformationContextMarker.BlockInside(i))
                ValDefTransform.fromBlock(using qctx)(nestCtx, v)
@@ -37,22 +37,22 @@ class BlockTransform[F[_]:Type, T:Type](cpsCtx: TransformationContext[F,T]):
          case t: Term =>
            // TODO: rootTransform
            t.seal match
-               case '{ $p:$tp } =>
+               case '{ $p: $tp } =>
                        if (checkValueDiscarded(using qctx)(t))
                            // TODO: minimise and submit bug to dotty
                            // bug in dotty: show cause match error in test
                            def safeShow(): String =
                              try
-                               tp.show
+                               TypeRepr.of[tp].show
                              catch
                                case ex: Throwable => //ex.printStackTrace()
-                               tp.unseal.toString
+                               TypeRepr.of[tp].toString
 
                            if (cpsCtx.flags.customValueDiscard)
                              val valueDiscard = TypeIdent(Symbol.classSymbol("cps.ValueDiscard")).tpe
                              val tpe = t.tpe.widen.dealias
                              val tpTree = valueDiscard.appliedTo(tpe)
-                             searchImplicit(tpTree) match
+                             Implicits.search(tpTree) match
                                case sc: ImplicitSearchSuccess =>
                                   val pd = Apply(Select.unique(sc.tree,"apply"),List(t)).seal.cast[Unit]
                                   Async.nestTransform(pd, cpsCtx, TransformationContextMarker.BlockInside(i))
@@ -60,12 +60,12 @@ class BlockTransform[F[_]:Type, T:Type](cpsCtx: TransformationContext[F,T]):
                                   val tps = safeShow()
                                   val msg = s"discarding non-unit value without custom discard $tps (${fl.explanation})"
                                   if (cpsCtx.flags.warnValueDiscard)
-                                      warning(msg, t.pos)
+                                    Reporting.warning(msg, t.pos)
                                   else
-                                      error(msg, t.pos)
+                                    Reporting.error(msg, t.pos)
                                   Async.nestTransform(p, cpsCtx, TransformationContextMarker.BlockInside(i))
                            else
-                             warning(s"discarding non-unit value ${safeShow()}", t.pos)
+                             Reporting.warning(s"discarding non-unit value ${safeShow()}", t.pos)
                              Async.nestTransform(p, cpsCtx, TransformationContextMarker.BlockInside(i))
                        else
                          Async.nestTransform(p, cpsCtx, TransformationContextMarker.BlockInside(i))

@@ -42,7 +42,7 @@ object MatchTreeTransform:
 
 
   def run[F[_]:Type,T:Type](using qctx1: QuoteContext)(cpsCtx1: TransformationContext[F,T],
-                         matchTerm: qctx1.tasty.Match): CpsExpr[F,T] = {
+                         matchTerm: qctx1.reflect.Match): CpsExpr[F,T] = {
 
      val tmpFType = Type[F]
      val tmpCTType = Type[T]

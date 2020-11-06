@@ -59,13 +59,13 @@ object TransformUtil:
 
   def namedLet(using qctx: QuoteContext)(name: String, rhs: qctx.reflect.Term)(body: qctx.reflect.Ident => qctx.reflect.Term): qctx.reflect.Term = {
     import qctx.reflect._
-    import scala.internal.quoted.showName
     import scala.quoted.QuoteContext
     import scala.quoted.Expr
+    // TODO use Block.let with name (see https://github.com/lampepfl/dotty/pull/10175)
     val expr = (rhs.seal: @unchecked) match {
       case '{ $rhsExpr: $t } =>
         '{
-          @showName(${Expr(name)})
+          // @showName(${Expr(name)})
           val x = $rhsExpr
           ${
             val id = ('x).unseal.asInstanceOf[Ident]

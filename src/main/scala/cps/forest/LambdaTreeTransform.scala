@@ -52,9 +52,9 @@ object LambdaTreeTransform:
 
 
   def run[F[_]:Type,T:Type](using qctx1: QuoteContext)(cpsCtx1: TransformationContext[F,T],
-                         lambdaTerm: qctx1.tasty.Term,
-                         params: List[qctx1.tasty.ValDef],
-                         expr: qctx1.tasty.Term): CpsExpr[F,T] = {
+                         lambdaTerm: qctx1.reflect.Term,
+                         params: List[qctx1.reflect.ValDef],
+                         expr: qctx1.reflect.Term): CpsExpr[F,T] = {
 
      val tmpFType = Type[F]
      val tmpCTType = Type[T]

@@ -25,7 +25,7 @@ trait CpsTreeScope[F[_], CT] {
      def typeApply(targs: List[qctx.reflect.TypeTree], ntpe: TypeRepr): CpsTree =
             applyTerm(_.appliedToTypeTrees(targs), ntpe)
 
-     def applyTerm(f: Term => Term, ntpe: TypeReprTypeRepr): CpsTree
+     def applyTerm(f: Term => Term, ntpe: TypeRepr): CpsTree
 
      def monadMap(f: Term => Term, ntpe:TypeRepr): CpsTree
 

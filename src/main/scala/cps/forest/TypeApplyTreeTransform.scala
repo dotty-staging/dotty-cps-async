@@ -23,9 +23,9 @@ object TypeApplyTreeTransform:
 
 
   def run[F[_]:Type,T:Type](using qctx1: QuoteContext)(cpsCtx1: TransformationContext[F,T],
-                         applyTerm: qctx1.tasty.Term,
-                         fun: qctx1.tasty.Term,
-                         targs: List[qctx1.tasty.TypeTree]): CpsExpr[F,T] = {
+                         applyTerm: qctx1.reflect.Term,
+                         fun: qctx1.reflect.Term,
+                         targs: List[qctx1.reflect.TypeTree]): CpsExpr[F,T] = {
      val tmpFType = Type[F]
      val tmpCTType = Type[T]
      class Bridge(tc:TransformationContext[F,T]) extends

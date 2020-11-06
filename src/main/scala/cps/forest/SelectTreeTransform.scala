@@ -22,7 +22,7 @@ object SelectTreeTransform:
 
 
   def run[F[_]:Type,T:Type](using qctx1: QuoteContext)(cpsCtx1: TransformationContext[F,T],
-                         selectTerm: qctx1.tasty.Select): CpsExpr[F,T] = {
+                         selectTerm: qctx1.reflect.Select): CpsExpr[F,T] = {
 
      val tmpFType = Type[F]
      val tmpCTType = Type[T]

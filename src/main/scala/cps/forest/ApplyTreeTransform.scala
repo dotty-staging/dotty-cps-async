@@ -289,7 +289,6 @@ trait ApplyTreeTransform[F[_],CT]:
   }
 
   def buildApplyArgRecord(fun:Term, paramsDescriptor: MethodParamsDescriptor, t: Term, cpsCtx: TransformationContext[F,?], acc:BuildApplyArgsAcc): BuildApplyArgsAcc = {
-       import scala.internal.quoted.showName
        import scala.quoted.QuoteContext
        import scala.quoted.Expr
 
@@ -382,7 +381,7 @@ trait ApplyTreeTransform[F[_],CT]:
     val tpe = e.tpe.widen
     val asyncShift = TypeIdent(Symbol.classSymbol("cps.AsyncShift")).tpe
     val tpTree = asyncShift.appliedTo(tpe)
-    searchImplicit(tpTree)
+    Implicits.search(tpTree)
 
   def findObjectAsyncShiftTerm(e:Term):ImplicitSearchResult =
     val tpe = e.tpe.widen
@@ -390,10 +389,10 @@ trait ApplyTreeTransform[F[_],CT]:
     val tpTree = objAsyncShift.appliedTo(tpe)
     //val tpTree = TypeRepr.of[ObjectAsyncShift].appliedTo(tpe).simplified
     if cpsCtx.flags.debugLevel >= 15 then
-      cpsCtx.log(s"searchImplicits: tpTree=$tpTree")
+      cpsCtx.log(s"Implicits.search: tpTree=$tpTree")
       cpsCtx.log(s"tpe=$tpe")
       cpsCtx.log(s"TypeRepr.of[ObjectAsyncShift]=${TypeRepr.of[ObjectAsyncShift]}")
-    searchImplicit(tpTree)
+    Implicits.search(tpTree)
 
 
 
@@ -416,7 +415,7 @@ trait ApplyTreeTransform[F[_],CT]:
 
            val newSelect = Select.unique(shiftedExpr, x.name)
 
-           if targs.isEmpty
+           if targs.isEmpty then
                newSelect
            else
                TypeApply(newSelect, targs)
@@ -533,9 +532,9 @@ object ApplyTreeTransform:
 
 
   def run[F[_]:Type,T:Type](using qctx1: QuoteContext)(cpsCtx1: TransformationContext[F,T],
-                         applyTerm: qctx1.tasty.Term,
-                         fun: qctx1.tasty.Term,
-                         args: List[qctx1.tasty.Term]): CpsExpr[F,T] = {
+                         applyTerm: qctx1.reflect.Term,
+                         fun: qctx1.reflect.Term,
+                         args: List[qctx1.reflect.Term]): CpsExpr[F,T] = {
      //val tmpCpsCtx = cpsCtx
      val tmpQctx = qctx1
      val tmpFtype = Type[F]

@@ -187,7 +187,7 @@ trait ApplyArgRecordScope[F[_], CT]:
                                wasDefault: Boolean):List[CaseDef]=
               rest match
                 case h::t =>
-                     val nh = rebindCaseDef(h, Literal(Constant(true)), Map.empty, false)
+                     val nh = rebindCaseDef(h, Literal(Constant.Boolean(true)), Map.empty, false)
                      transformCases(t, nh::acc, wasDefault)
                 case Nil =>
                       val lastCase = casePattern match
@@ -209,7 +209,7 @@ trait ApplyArgRecordScope[F[_], CT]:
             val mt = MethodType(paramNames)( _ => List(fromType), _ => toInF)
             createAsyncLambda(mt, params)
 
-         def termCast[E](term: Term, tp: Type[E]): Expr[E] =
+         def termCast[E: Type](term: Term): Expr[E] =
             // changing to cast trigger https://github.com/lampepfl/dotty/issues/9518
             //given Type[E] = tp
             //term.seal.cast[E]
@@ -220,10 +220,10 @@ trait ApplyArgRecordScope[F[_], CT]:
            case '[$ft] =>
              toInF.seal match
                case '[$tt] =>
-                  '{ new PartialFunction[$ft,$tt] {
-                       override def isDefinedAt(x1:$ft):Boolean =
+                  '{ new PartialFunction[ft,tt] {
+                       override def isDefinedAt(x1:ft):Boolean =
                           ${ newCheckBody('x1.unseal ).seal.cast[Boolean] }
-                       override def apply(x2:$ft): $tt =
+                       override def apply(x2:ft): tt =
                           ${ val nBody = cpsBody.transformed
                              nBody match
                                case m@Match(scr,caseDefs) =>
@@ -231,7 +231,7 @@ trait ApplyArgRecordScope[F[_], CT]:
                                  val nCaseDefs = caseDefs.map( cd =>
                                                     rebindCaseDef(cd, cd.rhs, b0, true))
                                  val nTerm = Match('x2.unseal, nCaseDefs)
-                                 termCast(nTerm,tt)
+                                 termCast[tt](nTerm)
                                case _ =>
                                  throw MacroError(
                                    s"assumed that transformed match is Match, we have $nBody",
