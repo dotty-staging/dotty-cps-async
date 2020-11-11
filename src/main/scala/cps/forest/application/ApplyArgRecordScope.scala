@@ -125,7 +125,7 @@ trait ApplyArgRecordScope[F[_], CT]:
             val (params, body) = term match
               case Lambda(params, body) => (params, body)
               case _ =>
-                 throw MacroError(s"Lambda expexted, we have ${term.seal.show}",term.seal)
+                 throw MacroError(s"Lambda expexted, we have ${term.asExpr.show}",term.asExpr)
             term.tpe match
               case MethodType(paramNames, paramTypes, resType) =>
                   val mt = shiftedMethodType(paramNames, paramTypes, resType)
@@ -141,14 +141,14 @@ trait ApplyArgRecordScope[F[_], CT]:
                       val (tIn, tOut) = tparams match
                          case tIn::tOut::Nil => (tIn, tOut)
                          case _ =>
-                           throw MacroError(s"PartialFunction should have 2 type parameters, we have $tparams", term.seal)
+                           throw MacroError(s"PartialFunction should have 2 type parameters, we have $tparams", term.asExpr)
                       val matchTerm = body match
                          case m@Match(_,_) => m
                          case _ =>
                            throw MacroError(s"PartialFunction should be represented as Match term, we have $body", posExprs(body,term))
                       createAsyncPartialFunction(tIn, tOut, matchTerm, params)
                   } else {
-                      throw MacroError(s"FunctionType expected, we have ${tp}", term.seal)
+                      throw MacroError(s"FunctionType expected, we have ${tp}", term.asExpr)
                   }
               case other =>
                   // TODO: logging compiler interface instead println
@@ -156,7 +156,7 @@ trait ApplyArgRecordScope[F[_], CT]:
                   println(s"term.show = ${term.show}")
                   println(s"term.body = ${term}")
                   println(s"mt = ${other}")
-                  throw MacroError(s"methodType expected for ${term.seal.show}, we have $other",term.seal)
+                  throw MacroError(s"methodType expected for ${term.asExpr.show}, we have $other",term.asExpr)
          else
             term
 
@@ -177,7 +177,7 @@ trait ApplyArgRecordScope[F[_], CT]:
          def newCheckBody(inputVal:Term):Term =
 
             val casePattern = '{
-                 ${inputVal.seal} match
+                 ${inputVal.asExpr} match
                     case _ => false
             }.unseal
 
@@ -212,17 +212,17 @@ trait ApplyArgRecordScope[F[_], CT]:
          def termCast[E: Type](term: Term): Expr[E] =
             // changing to cast trigger https://github.com/lampepfl/dotty/issues/9518
             //given Type[E] = tp
-            //term.seal.cast[E]
-            term.seal.asInstanceOf[Expr[E]]
+            //term.asExprOf[E]
+            term.asExpr.asInstanceOf[Expr[E]]
 
 
-         val r = fromType.seal match
+         val r = fromType.asExpr match
            case '[$ft] =>
-             toInF.seal match
+             toInF.asExpr match
                case '[$tt] =>
                   '{ new PartialFunction[ft,tt] {
                        override def isDefinedAt(x1:ft):Boolean =
-                          ${ newCheckBody('x1.unseal ).seal.cast[Boolean] }
+                          ${ newCheckBody('x1.unseal ).asExprOf[Boolean] }
                        override def apply(x2:ft): tt =
                           ${ val nBody = cpsBody.transformed
                              nBody match

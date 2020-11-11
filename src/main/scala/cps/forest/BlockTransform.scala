@@ -27,7 +27,7 @@ class BlockTransform[F[_]:Type, T:Type](cpsCtx: TransformationContext[F,T]):
          case d: Definition =>
            d match {
              case v@ValDef(vName,vtt,optRhs) =>
-               val valDefExpr = Block(List(v),Literal(Constant.Unit())).seal.cast[Unit]
+               val valDefExpr = Block(List(v),Literal(Constant.Unit())).asExprOf[Unit]
                val nestCtx = cpsCtx.nest(valDefExpr, uType,
                                          TransformationContextMarker.BlockInside(i))
                ValDefTransform.fromBlock(using qctx)(nestCtx, v)
@@ -36,7 +36,7 @@ class BlockTransform[F[_]:Type, T:Type](cpsCtx: TransformationContext[F,T]):
            }
          case t: Term =>
            // TODO: rootTransform
-           t.seal match
+           t.asExpr match
                case '{ $p: $tp } =>
                        if (checkValueDiscarded(using qctx)(t))
                            // TODO: minimise and submit bug to dotty
@@ -54,7 +54,7 @@ class BlockTransform[F[_]:Type, T:Type](cpsCtx: TransformationContext[F,T]):
                              val tpTree = valueDiscard.appliedTo(tpe)
                              Implicits.search(tpTree) match
                                case sc: ImplicitSearchSuccess =>
-                                  val pd = Apply(Select.unique(sc.tree,"apply"),List(t)).seal.cast[Unit]
+                                  val pd = Apply(Select.unique(sc.tree,"apply"),List(t)).asExprOf[Unit]
                                   Async.nestTransform(pd, cpsCtx, TransformationContextMarker.BlockInside(i))
                                case fl: ImplicitSearchFailure =>
                                   val tps = safeShow()
@@ -71,7 +71,7 @@ class BlockTransform[F[_]:Type, T:Type](cpsCtx: TransformationContext[F,T]):
                          Async.nestTransform(p, cpsCtx, TransformationContextMarker.BlockInside(i))
                case other =>
                        printf(other.show)
-                       throw MacroError(s"can't handle term in block: $other",t.seal)
+                       throw MacroError(s"can't handle term in block: $other",t.asExpr)
          case i:Import =>
             // Import is not statement - so, it is impossible to create block with import
             //   in macros.
@@ -82,7 +82,7 @@ class BlockTransform[F[_]:Type, T:Type](cpsCtx: TransformationContext[F,T]):
             printf(other.show)
             throw MacroError(s"unknown tree type in block: $other",patternCode)
      }
-     val rLast = Async.nestTransform(last.seal.cast[T],cpsCtx,TransformationContextMarker.BlockLast)
+     val rLast = Async.nestTransform(last.asExprOf[T],cpsCtx,TransformationContextMarker.BlockLast)
      val blockResult = rPrevs.foldRight(rLast)((e,s) => e.append(s))
      // wrap yet in one Expr, to avoid unrolling during append in enclosing block).
      val retval = CpsExpr.wrap(blockResult)

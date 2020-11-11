@@ -62,14 +62,14 @@ object TransformUtil:
     import scala.quoted.QuoteContext
     import scala.quoted.Expr
     // TODO use Block.let with name (see https://github.com/lampepfl/dotty/pull/10175)
-    val expr = (rhs.seal: @unchecked) match {
+    val expr = (rhs.asExpr: @unchecked) match {
       case '{ $rhsExpr: $t } =>
         '{
           // @showName(${Expr(name)})
           val x = $rhsExpr
           ${
             val id = ('x).unseal.asInstanceOf[Ident]
-            body(id).seal
+            body(id).asExpr
           }
         }
     }

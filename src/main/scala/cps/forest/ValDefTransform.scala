@@ -19,7 +19,7 @@ object ValDefTransform:
      val rhs = valDef.rhs.getOrElse(
              throw MacroError(s"val $valDef without right part in block ", cpsCtx.patternCode)
      )
-     rhs.seal match
+     rhs.asExpr match
         case '{ $e: $et } =>
             if (cpsCtx.flags.debugLevel > 15)
                cpsCtx.log(s"rightPart is ${e.show}")
@@ -101,7 +101,7 @@ object ValDefTransform:
 
        private def buildAppendBlockExpr[A:Type](using qctx: QuoteContext)(oldValDef: qctx.reflect.ValDef, rhs: qctx.reflect.Term, expr:Expr[A]):Expr[A] =
           import qctx.reflect._
-          buildAppendBlock(oldValDef,rhs,expr.unseal).seal.cast[A]
+          buildAppendBlock(oldValDef,rhs,expr.unseal).asExprOf[A]
 
   }
 
@@ -123,7 +123,7 @@ object ValDefTransform:
                    Block( prevStats ++: (valDef +: statements), last)
             case other =>
                    Block( prevStats ++: List(valDef), other)
-         outputTerm.seal.cast[T]
+         outputTerm.asExprOf[T]
        }
 
 
@@ -138,7 +138,7 @@ object ValDefTransform:
                  Block( prev.map(_.extract) ++: valDef +: stats, e)
              case other =>
                  Block( prev.map(_.extract) ++: List(valDef) , other)
-          block.seal.cast[F[T]]
+          block.asExprOf[F[T]]
 
        }
 

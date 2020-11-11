@@ -24,7 +24,7 @@ trait RootTreeTransform[F[_], CT]:
        case _ : PolyType =>
                 runRootUneta(term, marker)
        case _ =>
-                val expr = term.seal
+                val expr = term.asExpr
                 val monad = cpsCtx.monad
                 expr match {
                   case '{ $e: $et } =>
