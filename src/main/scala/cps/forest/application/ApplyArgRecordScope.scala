@@ -179,7 +179,7 @@ trait ApplyArgRecordScope[F[_], CT]:
             val casePattern = '{
                  ${inputVal.asExpr} match
                     case _ => false
-            }.unseal
+            }.asReflectTree
 
             @tailrec
             def transformCases(rest:List[CaseDef],
@@ -222,15 +222,15 @@ trait ApplyArgRecordScope[F[_], CT]:
                case '[$tt] =>
                   '{ new PartialFunction[ft,tt] {
                        override def isDefinedAt(x1:ft):Boolean =
-                          ${ newCheckBody('x1.unseal ).asExprOf[Boolean] }
+                          ${ newCheckBody('x1.asReflectTree ).asExprOf[Boolean] }
                        override def apply(x2:ft): tt =
                           ${ val nBody = cpsBody.transformed
                              nBody match
                                case m@Match(scr,caseDefs) =>
-                                 val b0 = Map(matchVar.symbol -> 'x2.unseal)
+                                 val b0 = Map(matchVar.symbol -> 'x2.asReflectTree)
                                  val nCaseDefs = caseDefs.map( cd =>
                                                     rebindCaseDef(cd, cd.rhs, b0, true))
-                                 val nTerm = Match('x2.unseal, nCaseDefs)
+                                 val nTerm = Match('x2.asReflectTree, nCaseDefs)
                                  termCast[tt](nTerm)
                                case _ =>
                                  throw MacroError(
@@ -239,7 +239,7 @@ trait ApplyArgRecordScope[F[_], CT]:
                                  )
                            }
                      }
-                   }.unseal
+                   }.asReflectTree
                case _ =>
                   throw MacroError("Can't skolemize $toInF", posExprs(term) )
            case _ =>

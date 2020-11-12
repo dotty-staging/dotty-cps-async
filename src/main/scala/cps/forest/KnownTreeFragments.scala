@@ -12,7 +12,7 @@ trait KnownTreeFragments[F[_], CT]:
 
   import qctx.reflect._
 
-  lazy val awaitPure = '{ _root_.cps.await[F,Int](${cpsCtx.monad}.pure(3))(using ${cpsCtx.monad}) }.unseal
+  lazy val awaitPure = '{ _root_.cps.await[F,Int](${cpsCtx.monad}.pure(3))(using ${cpsCtx.monad}) }.asReflectTree
 
   lazy val awaitSymbol = TransformUtil.find(awaitPure,
                            { case v@Select(x,m) if m == "await" => Some(v)
@@ -34,7 +34,7 @@ trait KnownTreeFragments[F[_], CT]:
 
   lazy val mapSymbol = {
         val mapTmpl =  '{ ${cpsCtx.monad}.map(${cpsCtx.monad}.pure(3))(_ + 1)  }
-                         .unseal
+                         .asReflectTree
 
         TransformUtil.find(mapTmpl,
                            { case v@Select(x,m) if m == "map" => Some(v)
@@ -45,7 +45,7 @@ trait KnownTreeFragments[F[_], CT]:
 
   lazy val flatMapSymbol = {
         val flatMapTmpl =  '{ ${cpsCtx.monad}.flatMap(${cpsCtx.monad}.pure(3))( x =>
-                                                                ${cpsCtx.monad}.pure(1 + x))  }.unseal
+                                                                ${cpsCtx.monad}.pure(1 + x))  }.asReflectTree
 
         TransformUtil.find(flatMapTmpl,
                            { case v@Select(x,m) if m == "flatMap" => Some(v)
