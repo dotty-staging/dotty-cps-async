@@ -176,10 +176,10 @@ trait ApplyArgRecordScope[F[_], CT]:
 
          def newCheckBody(inputVal:Term):Term =
 
-            val casePattern = '{
+            val casePattern = Term.of('{
                  ${inputVal.asExpr} match
                     case _ => false
-            }.unseal
+            })
 
             @tailrec
             def transformCases(rest:List[CaseDef],
@@ -220,17 +220,17 @@ trait ApplyArgRecordScope[F[_], CT]:
            case '[$ft] =>
              toInF.asExpr match
                case '[$tt] =>
-                  '{ new PartialFunction[ft,tt] {
+                  Term.of('{ new PartialFunction[ft,tt] {
                        override def isDefinedAt(x1:ft):Boolean =
-                          ${ newCheckBody('x1.unseal ).asExprOf[Boolean] }
+                          ${ newCheckBody(Term.of('x1) ).asExprOf[Boolean] }
                        override def apply(x2:ft): tt =
                           ${ val nBody = cpsBody.transformed
                              nBody match
                                case m@Match(scr,caseDefs) =>
-                                 val b0 = Map(matchVar.symbol -> 'x2.unseal)
+                                 val b0 = Map(matchVar.symbol -> Term.of('x2))
                                  val nCaseDefs = caseDefs.map( cd =>
                                                     rebindCaseDef(cd, cd.rhs, b0, true))
-                                 val nTerm = Match('x2.unseal, nCaseDefs)
+                                 val nTerm = Match(Term.of('x2), nCaseDefs)
                                  termCast[tt](nTerm)
                                case _ =>
                                  throw MacroError(
@@ -239,7 +239,7 @@ trait ApplyArgRecordScope[F[_], CT]:
                                  )
                            }
                      }
-                   }.unseal
+                  })
                case _ =>
                   throw MacroError("Can't skolemize $toInF", posExprs(term) )
            case _ =>

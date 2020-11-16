@@ -68,12 +68,12 @@ object TransformUtil:
           // @showName(${Expr(name)})
           val x = $rhsExpr
           ${
-            val id = ('x).unseal.asInstanceOf[Ident]
+            val id = Term.of('x).asInstanceOf[Ident]
             body(id).asExpr
           }
         }
     }
-    expr.unseal
+    Term.of(expr)
   }
 
 

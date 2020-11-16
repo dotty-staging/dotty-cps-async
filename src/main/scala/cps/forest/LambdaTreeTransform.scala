@@ -13,7 +13,7 @@ trait LambdaTreeTransform[F[_], CT]:
   import qctx.reflect._
 
   def typeInMonad(tp:TypeRepr): TypeRepr =
-       fType.unseal.tpe.appliedTo(tp)
+       Term.of(fType).tpe.appliedTo(tp)
 
   // case lambdaTree @ Lambda(params,body)
   def runLambda(lambdaTerm: Term, params: List[ValDef], expr: Term ): CpsTree =

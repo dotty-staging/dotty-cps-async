@@ -82,7 +82,7 @@ trait RootTreeTransform[F[_], CT]:
 
   def exprToTree(expr: CpsExpr[F,_], e: Term): CpsTree =
      if (expr.isAsync)
-         val transformed = expr.transformed.unseal
+         val transformed = expr.Term.of(transformed)
          AwaitSyncCpsTree(transformed, e.tpe)
      else
          PureCpsTree(e)
