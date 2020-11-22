@@ -41,7 +41,7 @@ trait MatchTreeTransform[F[_], CT]:
 object MatchTreeTransform:
 
 
-  def run[F[_]:Type,T:Type](using qctx1: QuoteContext)(cpsCtx1: TransformationContext[F,T],
+  def run[F[_]:Type,T:Type](using qctx1: Quotes)(cpsCtx1: TransformationContext[F,T],
                          matchTerm: qctx1.reflect.Match): CpsExpr[F,T] = {
 
      val tmpFType = Type[F]

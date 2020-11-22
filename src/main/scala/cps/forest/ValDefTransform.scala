@@ -9,7 +9,7 @@ import cps.misc._
 object ValDefTransform:
 
 
-  def fromBlock[F[_]:Type](using qctx:QuoteContext)(
+  def fromBlock[F[_]:Type](using qctx:Quotes)(
                            cpsCtx: TransformationContext[F,Unit],
                            valDef: qctx.reflect.ValDef): CpsExpr[F,Unit] = {
      import qctx.reflect._
@@ -43,7 +43,7 @@ object ValDefTransform:
   }
 
 
-  class RhsFlatMappedCpsExpr[F[_]:Type, T:Type, V:Type](using qctx:QuoteContext)
+  class RhsFlatMappedCpsExpr[F[_]:Type, T:Type, V:Type](using qctx:Quotes)
                                      (monad: Expr[CpsMonad[F]],
                                       prev: Seq[ExprTreeGen],
                                       oldValDef: qctx.reflect.ValDef,
@@ -52,7 +52,7 @@ object ValDefTransform:
                                      )
                                     extends AsyncCpsExpr[F,T](monad, prev) {
 
-       override def fLast(using qctx: QuoteContext) =
+       override def fLast(using qctx: Quotes) =
           import qctx.reflect._
 
           def appendBlockExpr[A:Type](rhs: qctx.reflect.Term, expr: Expr[A]):Expr[A] =
@@ -78,16 +78,16 @@ object ValDefTransform:
              RhsFlatMappedCpsExpr(using qctx)(monad, exprs ++: prev,oldValDef,cpsRhs,next)
 
 
-       override def append[A:Type](e: CpsExpr[F,A])(using qtcx: QuoteContext) =
+       override def append[A:Type](e: CpsExpr[F,A])(using qtcx: Quotes) =
           RhsFlatMappedCpsExpr(using qctx)(monad,prev,oldValDef,cpsRhs,next.append(e))
 
 
-       private def buildAppendBlock(using qctx:QuoteContext)(
+       private def buildAppendBlock(using qctx:Quotes)(
                       oldValDef: qctx.reflect.ValDef, rhs: qctx.reflect.Term,
                                                     exprTerm:qctx.reflect.Term): qctx.reflect.Term =
        {
           import qctx.reflect._
-          import scala.quoted.QuoteContext
+          import scala.quoted.Quotes
           import scala.quoted.Expr
 
           val valDef = ValDef(oldValDef.symbol, Some(rhs)).asInstanceOf[qctx.reflect.ValDef]
@@ -99,13 +99,13 @@ object ValDefTransform:
 
        }
 
-       private def buildAppendBlockExpr[A:Type](using qctx: QuoteContext)(oldValDef: qctx.reflect.ValDef, rhs: qctx.reflect.Term, expr:Expr[A]):Expr[A] =
+       private def buildAppendBlockExpr[A:Type](using qctx: Quotes)(oldValDef: qctx.reflect.ValDef, rhs: qctx.reflect.Term, expr:Expr[A]):Expr[A] =
           import qctx.reflect._
           buildAppendBlock(oldValDef,rhs,Term.of(expr)).asExprOf[A]
 
   }
 
-  class ValWrappedCpsExpr[F[_]:Type, T:Type, V:Type](using qctx: QuoteContext)(
+  class ValWrappedCpsExpr[F[_]:Type, T:Type, V:Type](using qctx: Quotes)(
                                       monad: Expr[CpsMonad[F]],
                                       prev: Seq[ExprTreeGen],
                                       oldValDef: qctx.reflect.ValDef,
@@ -114,7 +114,7 @@ object ValDefTransform:
 
        override def isAsync = next.isAsync
 
-       override def syncOrigin(using qctx:QuoteContext): Option[Expr[T]] = next.syncOrigin.map{ n =>
+       override def syncOrigin(using qctx:Quotes): Option[Expr[T]] = next.syncOrigin.map{ n =>
          import qctx.reflect._
          val prevStats: List[Statement] = prev.map(_.extract).toList
          val valDef: Statement = oldValDef.asInstanceOf[qctx.reflect.ValDef]
@@ -127,9 +127,9 @@ object ValDefTransform:
        }
 
 
-       override def fLast(using qctx: QuoteContext) = next.fLast
+       override def fLast(using qctx: Quotes) = next.fLast
 
-       override def transformed(using qctx: QuoteContext) = {
+       override def transformed(using qctx: Quotes) = {
           import qctx.reflect._
 
           val valDef = oldValDef.asInstanceOf[qctx.reflect.ValDef]
@@ -148,13 +148,13 @@ object ValDefTransform:
           else
             ValWrappedCpsExpr[F,T,V](using qctx)(monad, exprs ++: prev, oldValDef, next)
 
-       override def append[A:Type](e:CpsExpr[F,A])(using qctx: QuoteContext) =
+       override def append[A:Type](e:CpsExpr[F,A])(using qctx: Quotes) =
            ValWrappedCpsExpr(using qctx)(monad, prev,
                                          oldValDef.asInstanceOf[qctx.reflect.ValDef],
                                          next.append(e))
 
 
-       def prependPrev(using qctx:QuoteContext)(term: qctx.reflect.Term): qctx.reflect.Term =
+       def prependPrev(using qctx:Quotes)(term: qctx.reflect.Term): qctx.reflect.Term =
           import qctx.reflect._
           if (prev.isEmpty) {
              term

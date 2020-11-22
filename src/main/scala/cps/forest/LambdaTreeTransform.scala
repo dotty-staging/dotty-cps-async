@@ -51,7 +51,7 @@ trait LambdaTreeTransform[F[_], CT]:
 object LambdaTreeTransform:
 
 
-  def run[F[_]:Type,T:Type](using qctx1: QuoteContext)(cpsCtx1: TransformationContext[F,T],
+  def run[F[_]:Type,T:Type](using qctx1: Quotes)(cpsCtx1: TransformationContext[F,T],
                          lambdaTerm: qctx1.reflect.Term,
                          params: List[qctx1.reflect.ValDef],
                          expr: qctx1.reflect.Term): CpsExpr[F,T] = {

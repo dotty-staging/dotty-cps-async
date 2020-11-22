@@ -22,7 +22,7 @@ trait TypeApplyTreeTransform[F[_], CT]:
 object TypeApplyTreeTransform:
 
 
-  def run[F[_]:Type,T:Type](using qctx1: QuoteContext)(cpsCtx1: TransformationContext[F,T],
+  def run[F[_]:Type,T:Type](using qctx1: Quotes)(cpsCtx1: TransformationContext[F,T],
                          applyTerm: qctx1.reflect.Term,
                          fun: qctx1.reflect.Term,
                          targs: List[qctx1.reflect.TypeTree]): CpsExpr[F,T] = {

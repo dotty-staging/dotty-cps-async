@@ -21,7 +21,7 @@ trait SelectTreeTransform[F[_], CT]:
 object SelectTreeTransform:
 
 
-  def run[F[_]:Type,T:Type](using qctx1: QuoteContext)(cpsCtx1: TransformationContext[F,T],
+  def run[F[_]:Type,T:Type](using qctx1: Quotes)(cpsCtx1: TransformationContext[F,T],
                          selectTerm: qctx1.reflect.Select): CpsExpr[F,T] = {
 
      val tmpFType = Type[F]

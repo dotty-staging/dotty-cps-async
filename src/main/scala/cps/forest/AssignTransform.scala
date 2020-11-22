@@ -11,7 +11,7 @@ class AssignTransform[F[_]:Type,T:Type](cpsCtx: TransformationContext[F,T]):
   import cpsCtx._
 
   // case Assign(left,right)
-  def run(using qctx: QuoteContext)(left: qctx.reflect.Term, right: qctx.reflect.Term): CpsExpr[F,T] =
+  def run(using qctx: Quotes)(left: qctx.reflect.Term, right: qctx.reflect.Term): CpsExpr[F,T] =
      import qctx.reflect._
      left.asExpr match
         case '{ $le: $lt } =>
@@ -23,7 +23,7 @@ class AssignTransform[F[_]:Type,T:Type](cpsCtx: TransformationContext[F,T]):
             throw MacroError("Can't determinate type",left.asExpr)
 
 
-  def runWithLeft[L:Type](using qctx: QuoteContext)(
+  def runWithLeft[L:Type](using qctx: Quotes)(
        left: qctx.reflect.Term, right: qctx.reflect.Term, cpsLeft:CpsExpr[F,L]): CpsExpr[F,T] = {
      import qctx.reflect._
      right.asExpr match {
@@ -38,7 +38,7 @@ class AssignTransform[F[_]:Type,T:Type](cpsCtx: TransformationContext[F,T]):
   //implicit def getOrigin[S](x:CpsExprResult[F,S]): Type[S] = x.originType
 
 
-  def run1[L:Type,R:Type](using qctx: QuoteContext)(left: qctx.reflect.Term, right: qctx.reflect.Term,
+  def run1[L:Type,R:Type](using qctx: Quotes)(left: qctx.reflect.Term, right: qctx.reflect.Term,
                 cpsLeft: CpsExpr[F,L], cpsRight: CpsExpr[F,R]): CpsExpr[F,T] =
      import qctx.reflect._
      if (!cpsLeft.isAsync) {
@@ -63,7 +63,7 @@ class AssignTransform[F[_]:Type,T:Type](cpsCtx: TransformationContext[F,T]):
      }
 
 
-  def run2[L:Type,R:Type,LU:Type](using qctx: QuoteContext)(
+  def run2[L:Type,R:Type,LU:Type](using qctx: Quotes)(
             left: qctx.reflect.Term, right: qctx.reflect.Term,
              cpsLeft: CpsExpr[F,L], cpsRight: CpsExpr[F,R],
              cpsLu: CpsExpr[F,LU]): CpsExpr[F,T] =

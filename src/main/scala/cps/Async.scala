@@ -42,7 +42,7 @@ object Async {
   /**
    * transform expression and get monad from context.
    **/
-  def transformImpl[F[_]:Type,T:Type](f: Expr[T])(using qctx: QuoteContext): Expr[F[T]] =
+  def transformImpl[F[_]:Type,T:Type](f: Expr[T])(using qctx: Quotes): Expr[F[T]] =
     import qctx.reflect._
     Expr.summon[CpsMonad[F]] match
        case Some(dm) =>
@@ -56,7 +56,7 @@ object Async {
    * transform expression within given monad.  Use this function is you need to force async-transform
    * from other macros
    **/
-  def transformMonad[F[_]:Type,T:Type](f: Expr[T], dm: Expr[CpsMonad[F]])(using qctx: QuoteContext): Expr[F[T]] =
+  def transformMonad[F[_]:Type,T:Type](f: Expr[T], dm: Expr[CpsMonad[F]])(using qctx: Quotes): Expr[F[T]] =
     import qctx.reflect._
     import TransformationContextMarker._
     val flags = adoptFlags(f)
@@ -78,7 +78,7 @@ object Async {
         report.throwError(ex.msg, ex.posExpr)
 
 
-  def adoptFlags(f: Expr[_])(using qctx: QuoteContext): AsyncMacroFlags =
+  def adoptFlags(f: Expr[_])(using qctx: Quotes): AsyncMacroFlags =
     import qctx.reflect._
     Expr.summon[AsyncMacroFlags] match
       case Some(flagsExpr) =>
@@ -109,7 +109,7 @@ object Async {
                                       exprMarker: TransformationContextMarker,
                                       nesting: Int,
                                       parent: Option[TransformationContext[_,_]])(
-                                           using qctx: QuoteContext): CpsExpr[F,T] =
+                                           using qctx: Quotes): CpsExpr[F,T] =
      val tType = Type[T]
      import qctx.reflect._
      import util._
@@ -166,7 +166,7 @@ object Async {
 
   def nestTransform[F[_]:Type,T:Type,S:Type](f:Expr[S],
                                       cpsCtx: TransformationContext[F,T],
-                                      marker: TransformationContextMarker)(using qctx:QuoteContext):CpsExpr[F,S]=
+                                      marker: TransformationContextMarker)(using qctx:Quotes):CpsExpr[F,S]=
         rootTransform(f,cpsCtx.monad,
                       cpsCtx.flags,marker,cpsCtx.nesting+1, Some(cpsCtx))
 

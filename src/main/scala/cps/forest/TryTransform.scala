@@ -11,7 +11,7 @@ class TryTransform[F[_]:Type,T:Type](cpsCtx: TransformationContext[F,T]):
   import cpsCtx._
 
   // case Try(body, cases, finalizer)
-  def run(using qctx: QuoteContext)(body: qctx.reflect.Term,
+  def run(using qctx: Quotes)(body: qctx.reflect.Term,
                                     cases: List[qctx.reflect.CaseDef],
                                     finalizer: Option[qctx.reflect.Term]): CpsExpr[F,T] =
      import qctx.reflect._

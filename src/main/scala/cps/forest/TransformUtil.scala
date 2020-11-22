@@ -8,7 +8,7 @@ import cps._
 object TransformUtil:
 
 
-  def find(using qctx:QuoteContext)(term: qctx.reflect.Term,
+  def find(using qctx:Quotes)(term: qctx.reflect.Term,
                        cond: qctx.reflect.Tree=> Option[qctx.reflect.Tree]) :Option[qctx.reflect.Tree] = {
      import qctx.reflect._
      import util._
@@ -27,7 +27,7 @@ object TransformUtil:
      search.foldTree(None,term)
   }
 
-  def containsAwait(using qctx:QuoteContext)(term: qctx.reflect.Term): Boolean =
+  def containsAwait(using qctx:Quotes)(term: qctx.reflect.Term): Boolean =
     import qctx.reflect._
     find(term, {
            case v@Apply(TypeApply(id@Ident("await"),targs),args) =>
@@ -39,7 +39,7 @@ object TransformUtil:
   /**
    * substitute identifier with the origin symbol to new tree
    **/
-  def substituteIdent(using qctx:QuoteContext)(tree: qctx.reflect.Term,
+  def substituteIdent(using qctx:Quotes)(tree: qctx.reflect.Term,
                            origin: qctx.reflect.Symbol,
                            newTerm: qctx.reflect.Term): qctx.reflect.Term =
      import qctx.reflect._
@@ -57,9 +57,9 @@ object TransformUtil:
      changes.transformTerm(tree)
 
 
-  def namedLet(using qctx: QuoteContext)(name: String, rhs: qctx.reflect.Term)(body: qctx.reflect.Ident => qctx.reflect.Term): qctx.reflect.Term = {
+  def namedLet(using qctx: Quotes)(name: String, rhs: qctx.reflect.Term)(body: qctx.reflect.Ident => qctx.reflect.Term): qctx.reflect.Term = {
     import qctx.reflect._
-    import scala.quoted.QuoteContext
+    import scala.quoted.Quotes
     import scala.quoted.Expr
     // TODO use Block.let with name (see https://github.com/lampepfl/dotty/pull/10175)
     val expr = (rhs.asExpr: @unchecked) match {
