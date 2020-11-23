@@ -57,7 +57,7 @@ object TransformUtil:
      changes.transformTerm(tree)
 
 
-  def namedLet(using qctx: Quotes)(name: String, rhs: qctx.reflect.Term)(body: qctx.reflect.Ident => qctx.reflect.Term): qctx.reflect.Term = {
+  def namedLet(using Quotes)(name: String, rhs: qctx.reflect.Term)(body: qctx.reflect.Ident => qctx.reflect.Term): qctx.reflect.Term = {
     import qctx.reflect._
     import scala.quoted.Quotes
     import scala.quoted.Expr

@@ -10,7 +10,7 @@ case class UnsealExprTreeGen[T](expr: Expr[T]) extends ExprTreeGen:
   def extract(using qctx:Quotes): qctx.reflect.Statement =
     Term.of(expr)
 
-class StatementExprTreeGen(using qctx: Quotes)(stat: qctx.reflect.Statement) extends ExprTreeGen:
+class StatementExprTreeGen(using Quotes)(stat: qctx.reflect.Statement) extends ExprTreeGen:
   def extract(using qctx:Quotes): qctx.reflect.Statement =
     stat.asInstanceOf[qctx.reflect.Statement]
 
@@ -21,7 +21,7 @@ trait CpsExpr[F[_]:Type,T:Type](monad:Expr[CpsMonad[F]], prev: Seq[ExprTreeGen])
 
   def fLast(using Quotes): Expr[F[T]]
 
-  def transformed(using qctx: Quotes): Expr[F[T]] =
+  def transformed(using Quotes): Expr[F[T]] =
      import qctx.reflect._
      if (prev.isEmpty)
        fLast
@@ -65,7 +65,7 @@ abstract class SyncCpsExpr[F[_]:Type, T: Type](dm: Expr[CpsMonad[F]],
      override def fLast(using Quotes): Expr[F[T]] =
           '{  ${dm}.pure(${last}) }
 
-     override def syncOrigin(using qctx: Quotes): Option[Expr[T]] = Some(
+     override def syncOrigin(using Quotes): Option[Expr[T]] = Some(
          if prev.isEmpty then
             last
          else

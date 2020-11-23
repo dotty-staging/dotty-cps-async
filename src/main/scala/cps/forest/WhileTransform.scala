@@ -13,7 +13,7 @@ object WhileTransform:
    **/
   def run[F[_]:Type,T:Type](cpsCtx: TransformationContext[F,T],
                                cond: Expr[Boolean], repeat: Expr[Unit]
-                               )(using qctx: Quotes): CpsExpr[F,T] =
+                               )(using Quotes): CpsExpr[F,T] =
      import qctx.reflect._
      import util._
      import cpsCtx._

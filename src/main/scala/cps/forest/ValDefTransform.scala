@@ -52,7 +52,7 @@ object ValDefTransform:
                                      )
                                     extends AsyncCpsExpr[F,T](monad, prev) {
 
-       override def fLast(using qctx: Quotes) =
+       override def fLast(using Quotes) =
           import qctx.reflect._
 
           def appendBlockExpr[A:Type](rhs: qctx.reflect.Term, expr: Expr[A]):Expr[A] =
@@ -99,13 +99,13 @@ object ValDefTransform:
 
        }
 
-       private def buildAppendBlockExpr[A:Type](using qctx: Quotes)(oldValDef: qctx.reflect.ValDef, rhs: qctx.reflect.Term, expr:Expr[A]):Expr[A] =
+       private def buildAppendBlockExpr[A:Type](using Quotes)(oldValDef: qctx.reflect.ValDef, rhs: qctx.reflect.Term, expr:Expr[A]):Expr[A] =
           import qctx.reflect._
           buildAppendBlock(oldValDef,rhs,Term.of(expr)).asExprOf[A]
 
   }
 
-  class ValWrappedCpsExpr[F[_]:Type, T:Type, V:Type](using qctx: Quotes)(
+  class ValWrappedCpsExpr[F[_]:Type, T:Type, V:Type](using Quotes)(
                                       monad: Expr[CpsMonad[F]],
                                       prev: Seq[ExprTreeGen],
                                       oldValDef: qctx.reflect.ValDef,
@@ -127,9 +127,9 @@ object ValDefTransform:
        }
 
 
-       override def fLast(using qctx: Quotes) = next.fLast
+       override def fLast(using Quotes) = next.fLast
 
-       override def transformed(using qctx: Quotes) = {
+       override def transformed(using Quotes) = {
           import qctx.reflect._
 
           val valDef = oldValDef.asInstanceOf[qctx.reflect.ValDef]
@@ -148,7 +148,7 @@ object ValDefTransform:
           else
             ValWrappedCpsExpr[F,T,V](using qctx)(monad, exprs ++: prev, oldValDef, next)
 
-       override def append[A:Type](e:CpsExpr[F,A])(using qctx: Quotes) =
+       override def append[A:Type](e:CpsExpr[F,A])(using Quotes) =
            ValWrappedCpsExpr(using qctx)(monad, prev,
                                          oldValDef.asInstanceOf[qctx.reflect.ValDef],
                                          next.append(e))
