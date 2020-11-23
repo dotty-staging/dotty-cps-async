@@ -14,7 +14,7 @@ object IfTransform:
   def run[F[_]:Type,T:Type](cpsCtx: TransformationContext[F,T],
                                cond: Expr[Boolean], ifTrue: Expr[T], ifFalse: Expr[T]
                                )(using Quotes): CpsExpr[F,T] =
-     import qctx.reflect._
+     import quotes.reflect._
      import util._
      import cpsCtx._
      val cR = Async.nestTransform(cond, cpsCtx, TransformationContextMarker.IfCond)

@@ -12,7 +12,7 @@ class InlinedTransform[F[_]:Type, T:Type](cpsCtx: TransformationContext[F,T]):
 
 
   // case Inlined(call, binding, expansion)
-  def run(using Quotes)(inlinedTerm: qctx.reflect.Inlined): CpsExpr[F,T] =
+  def run(using Quotes)(inlinedTerm: quotes.reflect.Inlined): CpsExpr[F,T] =
     val bodyExpr = inlinedTerm.body.asExprOf[T]
     val nested = Async.nestTransform(bodyExpr, cpsCtx, TransformationContextMarker.InlinedBody)
     if (inlinedTerm.bindings.isEmpty)
@@ -30,8 +30,8 @@ class InlinedCpsExpr[F[_]:Type,T:Type](using qctx0: Quotes)(
    override def isAsync = nested.isAsync
 
    override def fLast(using Quotes): Expr[F[T]] =
-      import qctx.reflect._
-      val qctxOldInlined = oldInlined.asInstanceOf[qctx.reflect.Inlined]
+      import quotes.reflect._
+      val qctxOldInlined = oldInlined.asInstanceOf[quotes.reflect.Inlined]
       val t = Inlined.copy(qctxOldInlined)(qctxOldInlined.call,
                                qctxOldInlined.bindings,
                                Term.of(nested.transformed))

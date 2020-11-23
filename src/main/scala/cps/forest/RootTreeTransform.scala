@@ -10,9 +10,9 @@ trait RootTreeTransform[F[_], CT]:
 
   thisTransform: TreeTransformScope[F, CT] =>
 
-  import qctx.reflect._
+  import quotes.reflect._
 
-  def runRoot(term: qctx.reflect.Term, marker: TransformationContextMarker): CpsTree =
+  def runRoot(term: quotes.reflect.Term, marker: TransformationContextMarker): CpsTree =
      if (cpsCtx.flags.debugLevel >= 15)
         cpsCtx.log(s"runRoot: term=$safeShow(term)")
      val r = term.tpe.widen match {
@@ -44,7 +44,7 @@ trait RootTreeTransform[F[_], CT]:
      r
 
 
-  def runRootUneta(term: qctx.reflect.Term, marker: TransformationContextMarker): CpsTree = {
+  def runRootUneta(term: quotes.reflect.Term, marker: TransformationContextMarker): CpsTree = {
      // TODO: change cpsCtx to show nesting
      if (cpsCtx.flags.debugLevel >= 15)
         cpsCtx.log(s"runRootUneta, term=$term")
@@ -53,7 +53,7 @@ trait RootTreeTransform[F[_], CT]:
        case Select(qual, name) =>
            runRoot(qual, TransformationContextMarker.Select) match
               case rq: AsyncCpsTree =>
-                  val cTransformed = rq.transformed.asInstanceOf[qctx.reflect.Term]
+                  val cTransformed = rq.transformed.asInstanceOf[quotes.reflect.Term]
                   CpsTree.impure(Select(cTransformed,term.symbol),term.tpe)
               case _: PureCpsTree =>
                   CpsTree.pure(term)
@@ -68,9 +68,9 @@ trait RootTreeTransform[F[_], CT]:
                 override val fType = thisScope.fType
                 override val ctType = thisScope.ctType
              }
-             nestScope.runApply(term.asInstanceOf[nestScope.qctx.reflect.Term],
-                                x.asInstanceOf[nestScope.qctx.reflect.Term],
-                                args.asInstanceOf[List[nestScope.qctx.reflect.Term]],
+             nestScope.runApply(term.asInstanceOf[nestScope.quotes.reflect.Term],
+                                x.asInstanceOf[nestScope.quotes.reflect.Term],
+                                args.asInstanceOf[List[nestScope.quotes.reflect.Term]],
                                 Nil).asInstanceOf[CpsTree]
        case _ =>
              throw MacroError(s"cps tree transform is not supported yet to ${term}",cpsCtx.patternCode)

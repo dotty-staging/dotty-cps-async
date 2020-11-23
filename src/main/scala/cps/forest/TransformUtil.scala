@@ -8,9 +8,9 @@ import cps._
 object TransformUtil:
 
 
-  def find(using qctx:Quotes)(term: qctx.reflect.Term,
-                       cond: qctx.reflect.Tree=> Option[qctx.reflect.Tree]) :Option[qctx.reflect.Tree] = {
-     import qctx.reflect._
+  def find(using qctx:Quotes)(term: quotes.reflect.Term,
+                       cond: quotes.reflect.Tree=> Option[quotes.reflect.Tree]) :Option[quotes.reflect.Tree] = {
+     import quotes.reflect._
      import util._
      val search = new TreeAccumulator[Option[Tree]] {
 
@@ -27,8 +27,8 @@ object TransformUtil:
      search.foldTree(None,term)
   }
 
-  def containsAwait(using qctx:Quotes)(term: qctx.reflect.Term): Boolean =
-    import qctx.reflect._
+  def containsAwait(using qctx:Quotes)(term: quotes.reflect.Term): Boolean =
+    import quotes.reflect._
     find(term, {
            case v@Apply(TypeApply(id@Ident("await"),targs),args) =>
                          if (id.symbol.fullName == "cps.await") Some(v) else None
@@ -39,10 +39,10 @@ object TransformUtil:
   /**
    * substitute identifier with the origin symbol to new tree
    **/
-  def substituteIdent(using qctx:Quotes)(tree: qctx.reflect.Term,
-                           origin: qctx.reflect.Symbol,
-                           newTerm: qctx.reflect.Term): qctx.reflect.Term =
-     import qctx.reflect._
+  def substituteIdent(using qctx:Quotes)(tree: quotes.reflect.Term,
+                           origin: quotes.reflect.Symbol,
+                           newTerm: quotes.reflect.Term): quotes.reflect.Term =
+     import quotes.reflect._
      import util._
      val changes = new TreeMap() {
         override def transformTerm(tree:Term)(using ctx: Context):Term =
@@ -57,8 +57,8 @@ object TransformUtil:
      changes.transformTerm(tree)
 
 
-  def namedLet(using Quotes)(name: String, rhs: qctx.reflect.Term)(body: qctx.reflect.Ident => qctx.reflect.Term): qctx.reflect.Term = {
-    import qctx.reflect._
+  def namedLet(using Quotes)(name: String, rhs: quotes.reflect.Term)(body: quotes.reflect.Ident => quotes.reflect.Term): quotes.reflect.Term = {
+    import quotes.reflect._
     import scala.quoted.Quotes
     import scala.quoted.Expr
     // TODO use Block.let with name (see https://github.com/lampepfl/dotty/pull/10175)

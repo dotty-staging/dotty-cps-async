@@ -11,7 +11,7 @@ trait MethodParamsDescriptorScope[F[_], CT]:
 
   thisTreeTransform: TreeTransformScope[F,CT] =>
 
-  import qctx.reflect._
+  import quotes.reflect._
 
 
 

@@ -10,7 +10,7 @@ trait MatchTreeTransform[F[_], CT]:
 
   thisScope: TreeTransformScope[F, CT] =>
 
-  import qctx.reflect._
+  import quotes.reflect._
 
   // case selectTerm @ Select(qualifier,name)
   def runMatch( matchTerm: Match ): CpsTree =
@@ -54,7 +54,7 @@ object MatchTreeTransform:
          implicit val ctType: Type[T] = tmpCTType
 
          def bridge(): CpsExpr[F,T] =
-            val origin = matchTerm.asInstanceOf[qctx.reflect.Match]
+            val origin = matchTerm.asInstanceOf[quotes.reflect.Match]
             runMatch(origin).toResult[T]
 
 

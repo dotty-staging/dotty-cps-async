@@ -4,7 +4,7 @@ trait AsyncTreeShifter[F[_], CT]:
 
    thisTreeTransform: TreeTransformScope[F, CT] =>
 
-   import qctx.reflect._
+   import quotes.reflect._
 
 
    def asyncShift(t:Term, shiftedSymbols:Set[Symbol]):Term =

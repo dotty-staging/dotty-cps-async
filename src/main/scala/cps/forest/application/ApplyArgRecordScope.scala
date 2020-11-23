@@ -13,7 +13,7 @@ trait ApplyArgRecordScope[F[_], CT]:
 
   thisTreeTransform: TreeTransformScope[F,CT] =>
 
-  import qctx.reflect._
+  import quotes.reflect._
 
 
   sealed trait ApplyArgRecord:
