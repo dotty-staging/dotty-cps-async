@@ -6,6 +6,6 @@ object implicitAwait:
 
   trait IsPossible[F[_]]
 
-  inline given conversion[F[_],T](using CpsMonad[F], IsPossible[F]) as Conversion[F[T],T] =
-           x => await(x) 
+  inline given [F[_],T] => (CpsMonad[F], IsPossible[F]) => Conversion[F[T],T] as conversion =
+           x => await(x)
 
