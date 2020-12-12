@@ -182,10 +182,10 @@ trait ApplyArgRecordScope[F[_], CT]:
 
          def newCheckBody(inputVal:Term):Term =
 
-            val casePattern = Term.of('{
+            val casePattern = '{
                  ${inputVal.asExpr} match
                     case _ => false
-            })
+            }.asTerm
 
             @tailrec
             def transformCases(rest:List[CaseDef],
@@ -193,7 +193,7 @@ trait ApplyArgRecordScope[F[_], CT]:
                                wasDefault: Boolean):List[CaseDef]=
               rest match
                 case h::t =>
-                     val nh = rebindCaseDef(h, Literal(Constant.Boolean(true)), Map.empty, false)
+                     val nh = rebindCaseDef(h, Literal(BooleanConstant(true)), Map.empty, false)
                      transformCases(t, nh::acc, wasDefault)
                 case Nil =>
                       val lastCase = casePattern match
@@ -223,17 +223,17 @@ trait ApplyArgRecordScope[F[_], CT]:
            case '[ftt] =>
              toInF.asType match
                case '[ttt] =>
-                  Term.of('{ new PartialFunction[ftt,ttt] {
+                  ('{ new PartialFunction[ftt,ttt] {
                        override def isDefinedAt(x1:ftt):Boolean =
-                          ${ newCheckBody(Term.of('x1)).asExprOf[Boolean] }
+                          ${ newCheckBody('x1.asTerm).asExprOf[Boolean] }
                        override def apply(x2:ftt): ttt =
                           ${ val nBody = cpsBody.transformed
                              nBody match
                                case m@Match(scr,caseDefs) =>
-                                 val b0 = Map(matchVar.symbol -> Term.of('x2))
+                                 val b0 = Map(matchVar.symbol -> 'x2.asTerm)
                                  val nCaseDefs = caseDefs.map( cd =>
                                                     rebindCaseDef(cd, cd.rhs, b0, true))
-                                 val nTerm = Match(Term.of('x2), nCaseDefs)
+                                 val nTerm = Match('x2.asTerm, nCaseDefs)
                                  termCast(nTerm)
                                case _ =>
                                  throw MacroError(
@@ -242,7 +242,7 @@ trait ApplyArgRecordScope[F[_], CT]:
                                  )
                            }
                      }
-                   })
+                   }).asTerm
                case _ =>
                   throw MacroError("Can't skolemize $toInF", posExprs(term) )
            case _ =>
@@ -310,7 +310,7 @@ trait ApplyArgRecordScope[F[_], CT]:
              override def transformTerm(tree:Term)(owner: Symbol):Term =
                tree match
                  case ident@Ident(name) => lookupParamTerm(ident.symbol) match
-                                             case Some(paramTerm) => 
+                                             case Some(paramTerm) =>
                                                           if (cpsCtx.flags.debugLevel >= 20) then
                                                               cpsCtx.log(s"changeSym, changed $ident to $paramTerm")
                                                               cpsCtx.log(s"oldHashcode: ${ident.symbol.hashCode}, new Hash: ${paramTerm.symbol.hashCode}")
@@ -358,7 +358,7 @@ trait ApplyArgRecordScope[F[_], CT]:
                             MatchType(transformType(bound)(owner),transformType(scrutinee)(owner),
                                                         cases.map(x => transformType(x)(owner)))
                  case ByNameType(tp1) => ByNameType(transformType(tp1)(owner))
-                 case ParamRef(x) => tp
+                 case ParamRef(x, index) => tp  //transform tp ?
                  case NoPrefix() => tp
                  case TypeBounds(low,hi) => TypeBounds(transformType(low)(owner),transformType(hi)(owner))
                  case _ => tp  //  hope nobody will put termRef inside recursive type
