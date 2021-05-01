@@ -37,26 +37,6 @@ object TransformUtil:
          }).isDefined
 
 
-  /**
-   * substitute identifier with the origin symbol to new tree
-   **/
-  def substituteIdent(using qctx:Quotes)(tree: qctx.reflect.Term,
-                           origin: qctx.reflect.Symbol,
-                           newTerm: qctx.reflect.Term): qctx.reflect.Term =
-     import quotes.reflect._
-     import util._
-     val changes = new TreeMap() {
-        override def transformTerm(tree:Term)(owner: Symbol):Term =
-          tree match
-            case ident@Ident(name) => if (ident.symbol == origin) {
-                                         newTerm
-                                      } else {
-                                         super.transformTerm(tree)(owner)
-                                      }
-            case _ => super.transformTerm(tree)(owner)
-     }
-     changes.transformTerm(tree)(Symbol.spliceOwner)
-
 
   def createFunctionType(using Quotes)(argTypes: List[quotes.reflect.TypeRepr], 
                                        resultType: quotes.reflect.TypeRepr): quotes.reflect.TypeRepr =
@@ -65,4 +45,77 @@ object TransformUtil:
     val funTypeTree: TypeTree = TypeIdent(funSymbol)
     funTypeTree.tpe.appliedTo(argTypes.map(_.widen) :+ resultType.widen)
 
+  
+  def substituteLambdaParams(using qctx:Quotes)(oldParams:List[quotes.reflect.ValDef], 
+                                                newParams: List[quotes.reflect.Tree], 
+                                                body: quotes.reflect.Term, 
+                                                owner: quotes.reflect.Symbol) : quotes.reflect.Term = 
+    import quotes.reflect._
+    val paramsMap = oldParams.zipWithIndex.map{case (tree,index)=>(tree.symbol,index)}.toMap
+    val indexedArgs = newParams.toIndexedSeq
+
+    // TODO: mege wirh changeSyms
+    val argTransformer = new TreeMap() {
+            override def transformTerm(tree: Term)(owner: Symbol): Term =
+               tree match
+                 case Ident(name) => paramsMap.get(tree.symbol) match
+                                        case Some(index) => Ref(indexedArgs(index).symbol)
+                                        case _  => super.transformTerm(tree)(owner)
+                 case _ => super.transformTerm(tree)(owner)
+    }
+    argTransformer.transformTerm(body)(owner)
+
+  /**
+   * widen, which works over 'or' and 'and' types.
+   *  (bug in dotty?)
+   **/
+  def veryWiden(using qctx: Quotes)(tp: qctx.reflect.TypeRepr): qctx.reflect.TypeRepr =
+    import quotes.reflect._
+    tp match
+      case OrType(lhs,rhs) => val nLhs = veryWiden(lhs)
+                              val nRhs = veryWiden(rhs)
+                              if (nLhs =:= nRhs) then
+                                  nLhs
+                              else
+                                  OrType(veryWiden(lhs),veryWiden(rhs))
+      case other => tp.widen
+
+
+  def ensureTyped(using qctx: Quotes)(term: qctx.reflect.Term, tp: qctx.reflect.TypeRepr): qctx.reflect.Term =
+     import quotes.reflect._
+     if (term.tpe =:= tp) then
+         term
+     else
+         Typed(term, Inferred(tp))
+
+
+  def safeShow(using Quotes)(t: quotes.reflect.Tree): String =
+    try
+      t.show
+    catch
+      case ex: Exception =>
+         t.toString
+
+  // used for debugging instrumentation
+  def dummyMapper(using Quotes)(t: quotes.reflect.Term, owner: quotes.reflect.Symbol): Boolean =
+     import quotes.reflect._
+     var wasError = false
+     val checker = new TreeMap() {
+
+
+         override def transformTerm(tree: Term)(owner: Symbol): Term =
+            try {
+              super.transformTerm(tree)(owner)
+            }catch{
+              case ex: Throwable =>
+                if (!wasError)
+                  ex.printStackTrace() 
+                  wasError = true
+                throw ex
+            }
+
+     } 
+     checker.transformTerm(t)(owner)
+     wasError
+     
 

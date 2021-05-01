@@ -14,11 +14,11 @@ User Manual
    BasicUsage
    HighOrderFunctions
    MonadsInteroperability
+   Integrations
    Features
    random-notes/index.rst
    FAQ
    References
-
 
 
 Indices and tables
@@ -27,3 +27,4 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+

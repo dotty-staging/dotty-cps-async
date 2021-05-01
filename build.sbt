@@ -1,9 +1,9 @@
-//val dottyVersion = "3.0.0-M1-bin-20201022-b26dbc4-NIGHTLY"
-//val dottyVersion = "3.0.0-M3-bin-SNAPSHOT"
-//val dottyVersion = "3.0.0-M3"
-val dottyVersion = dottyLatestNightlyBuild.get
+val dottyVersion = "3.0.1-RC1-bin-SNAPSHOT"
+//val dottyVersion = "3.0.0-RC3"
+//val dottyVersion = dottyLatestNightlyBuild.get
 
-ThisBuild/version := "0.3.5-SNAPSHOT"
+ThisBuild/version := "0.7.0-SNAPSHOT"
+ThisBuild/versionScheme := Some("semver-spec")
 
 val sharedSettings = Seq(
     organization := "com.github.rssh",
@@ -28,10 +28,11 @@ lazy val cps = crossProject(JSPlatform, JVMPlatform)
     .disablePlugins(SitePlugin)
     .jvmSettings(
         scalacOptions ++= Seq( "-unchecked", "-Ydebug-trace", "-Ydebug-names", "-Xprint-types", 
-                            "-Ydebug-type-error", "-uniqid" ),
+                            "-Ydebug", "-uniqid", "-Ycheck:macros", "-Yprint-syms"  ),
+                             // -Ydebug-error
         libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test",
     ).jsSettings(
         scalaJSUseMainModuleInitializer := true,
-        libraryDependencies += ("org.scala-js" %% "scalajs-junit-test-runtime" % "1.2.0" % Test).withDottyCompat(scalaVersion.value)
+        libraryDependencies += ("org.scala-js" %% "scalajs-junit-test-runtime" % "1.5.1" % Test).cross(CrossVersion.for3Use2_13)
     )
 

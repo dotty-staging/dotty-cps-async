@@ -10,8 +10,13 @@ object ConstTransform:
 
   // we know, that f is match to Const
   //(see rootTransform)
-  def apply[F[_]:Type,T:Type](cpsCtx: TransformationContext[F,T])(
-                                           using Quotes): CpsExpr[F,T] =
-     CpsExpr.sync(cpsCtx.monad, cpsCtx.patternCode) 
+  def run[F[_]:Type,T:Type](using Quotes)(cpsCtx: TransformationContext[F,T],
+                                          constTerm: quotes.reflect.Literal):CpsExpr[F,T] =
+     import quotes.reflect._
+     if (cpsCtx.flags.debugLevel >= 10) then
+        cpsCtx.log(s"const: T=${Type.show[T]}, code=${cpsCtx.patternCode.show}")
+     //CpsExpr.sync(cpsCtx.monad, Typed(constTerm, TypeTree.of[T] ).asExprOf[T], true) 
+     // policy: where to insert typed[?]
+     CpsExpr.sync(cpsCtx.monad, constTerm.asExprOf[T], false) 
 
 

@@ -1,5 +1,5 @@
 // CPS Transform for tasty block
-// (C) Ruslan Shevchenko <ruslan@shevchenko.kiev.ua>, 2019, 2020
+// (C) Ruslan Shevchenko <ruslan@shevchenko.kiev.ua>, 2019, 2020, 2021
 package cps.forest
 
 import scala.quoted._
@@ -16,7 +16,7 @@ class BlockTransform[F[_]:Type, T:Type](cpsCtx: TransformationContext[F,T]):
   def run(using qctx: Quotes)(prevs: List[qctx.reflect.Statement], last: qctx.reflect.Term): CpsExpr[F,T] =
 
      if (cpsCtx.flags.debugLevel >= 10) then
-        cpsCtx.log(s"Block transform, last=${last.show}")
+        cpsCtx.log(s"Block transform, last=${TransformUtil.safeShow(last)}")
      val tType = summon[Type[T]]
      val uType = summon[Type[Unit]]
      import qctx.reflect._
@@ -32,7 +32,7 @@ class BlockTransform[F[_]:Type, T:Type](cpsCtx: TransformationContext[F,T]):
                                          TransformationContextMarker.BlockInside(i))
                ValDefTransform.fromBlock(using qctx)(nestCtx, v)
              case _ =>
-               DefCpsExpr(using qctx)(cpsCtx.monad,Seq(),d)
+               DefCpsExpr(using qctx)(cpsCtx.monad,Seq(),d, false)
            }
          case t: Term =>
            // TODO: rootTransform
@@ -54,7 +54,12 @@ class BlockTransform[F[_]:Type, T:Type](cpsCtx: TransformationContext[F,T]):
                              val tpTree = valueDiscard.appliedTo(tpe)
                              Implicits.search(tpTree) match
                                case sc: ImplicitSearchSuccess =>
-                                  val pd = Apply(Select.unique(sc.tree,"apply"),List(t)).asExprOf[Unit]
+                                  val pd = {
+                                    if sc.tree.tpe <:< TypeRepr.of[cps.AwaitValueDiscard[?,?]] then
+                                      buildAwaitValueDiscardExpr(using qctx)(sc.tree, p)
+                                    else
+                                      Apply(Select.unique(sc.tree,"apply"),List(t)).asExprOf[Unit]
+                                  }
                                   Async.nestTransform(pd, cpsCtx, TransformationContextMarker.BlockInside(i))
                                case fl: ImplicitSearchFailure =>
                                   val tps = safeShow()
@@ -105,12 +110,60 @@ class BlockTransform[F[_]:Type, T:Type](cpsCtx: TransformationContext[F,T]):
        ( !(t.tpe =:= TypeRepr.of[Unit]) && !(t.tpe =:= TypeRepr.of[Nothing]) )
      )
 
+  def buildAwaitValueDiscardExpr(using Quotes)(discardTerm: quotes.reflect.Term, p: Expr[?]):Expr[Any] =
+      import quotes.reflect._
+
+      def parseDiscardTermType(tpe: TypeRepr): (TypeRepr, TypeRepr) =
+        tpe match
+           case AppliedType(base, targs) =>
+                  base match
+                    case TypeRef(sup, "AwaitValueDiscard") =>
+                       targs match
+                         case List(tf, tt) => (tf, tt)
+                         case _ =>
+                             val msg = s"Expected that AwaitValueDiscard have 2 type paraleters, but we have $targs"
+                             throw MacroError(msg, discardTerm.asExpr)
+                    case _ =>
+                       val msg = s"Reference to AwaitValueDiscard expected"
+                       throw MacroError(msg, discardTerm.asExpr)
+           case _ =>
+                  val msg = s"Can't parse AwaitValueDiscard type, tpe=${tpe}"
+                  throw MacroError(msg, discardTerm.asExpr)
+
+      discardTerm.tpe.asType match
+        case '[AwaitValueDiscard[F,tt]] =>
+           val refP = p.asExprOf[F[tt]]
+           '{  await[F,tt]($refP)(using ${cpsCtx.monad})  }
+        //bug in dotty. TODO: submit
+        //case '[AwaitValueDiscard[[xt]=>>ft,tt]] =>
+        //   ???
+        case _ => 
+           val (ftr, ttr) = parseDiscardTermType(discardTerm.tpe)
+           val ftmt = TypeRepr.of[CpsMonad].appliedTo(ftr)
+           Implicits.search(ftmt) match
+              case monadSuccess: ImplicitSearchSuccess =>
+                val ftm = monadSuccess.tree
+                Apply(    
+                     Apply(
+                       TypeApply(Ref(Symbol.requiredMethod("cps.await")), 
+                          List(Inferred(ftr),Inferred(ttr))),
+                       List(p.asTerm)
+                     ),
+                     List(ftm)
+                ).asExpr
+              case monadFailure: ImplicitSearchFailure =>
+                throw MacroError(s"Can't find appropriative monad for ${discardTerm.show}, ${monadFailure.explanation}  : ", p)
+           
+
 
 
 class DefCpsExpr[F[_]:Type](using qctx: Quotes)(
                      monad: Expr[CpsMonad[F]],
                      prev: Seq[ExprTreeGen],
-                     definition: quotes.reflect.Definition) extends SyncCpsExpr[F, Unit](monad, prev) {
+                     definition: quotes.reflect.Definition,
+                     changed: Boolean) extends SyncCpsExpr[F, Unit](monad, prev) {
+
+  override def isChanged = changed
 
   def last(using Quotes): Expr[Unit] = '{ () }
 
@@ -118,10 +171,10 @@ class DefCpsExpr[F[_]:Type](using qctx: Quotes)(
        if (exprs.isEmpty)
          this
        else
-         new DefCpsExpr(using quotes)(monad,exprs ++: prev,definition)
+         new DefCpsExpr(using quotes)(monad,exprs ++: prev,definition, changed || exprs.exists(_.isChanged)  )
 
   def append[A:Type](chunk: CpsExpr[F,A])(using Quotes): CpsExpr[F,A] =
-       chunk.prependExprs(Seq(StatementExprTreeGen(using this.qctx)(definition))).prependExprs(prev)
+       chunk.prependExprs(Seq(StatementExprTreeGen(using this.qctx)(definition, false))).prependExprs(prev)
 
 
 }

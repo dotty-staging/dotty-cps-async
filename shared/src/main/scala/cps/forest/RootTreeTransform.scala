@@ -42,24 +42,38 @@ trait RootTreeTransform[F[_], CT]:
                                               Nil).inCake(thisTransform)
                             )
                             tree.inCake(thisTransform)
+                  case inlined@Inlined(call,bindings,body) =>
+                            val tree = B2.inNestedContext(inlined, marker, muted, scope =>
+                               scope.runInlined(inlined.asInstanceOf[scope.qctx.reflect.Inlined])
+                                    .inCake(thisTransform)
+                            )
+                            tree
                   case _ =>  // TODO: elimi
                     val expr = term.asExpr
                     val monad = cpsCtx.monad
-                    expr match 
-                      case '{ $e: et } =>
+                    TransformUtil.veryWiden(term.tpe).asType match
+                      case '[ et ] =>
                         val rCpsExpr = try {
+                             if cpsCtx.flags.debugLevel >= 15 then
+                                cpsCtx.log(s"nextedTransfornm: orin = $term")
                              val nFlags = cpsCtx.flags.copy(muted = muted || cpsCtx.flags.muted)
-                             Async.nestTransform(e, cpsCtx.copy(flags = nFlags), marker)
+                             Async.nestTransform(term.asExprOf[et], cpsCtx.copy(flags = nFlags), marker)
                         } catch {
-                             case e: Throwable =>
-                                println(s"can't translate tree: $term" )
-                                throw e;
+                             case e: MacroError  =>
+                                if (!e.printed) then
+                                  println(s"can't translate tree: ${term.show}" )
+                                  e.printStackTrace()
+                                  throw e.copy(printed=true);
+                                else
+                                  throw e
                         }
                         val r = exprToTree(rCpsExpr, term)
                         if cpsCtx.flags.debugLevel >= 10 then
                            cpsCtx.log(s"runRoot: rCpsExpr=$rCpsExpr, async=${rCpsExpr.isAsync}")
                            if cpsCtx.flags.debugLevel >= 15 then
-                             cpsCtx.log(s"runRoot: r=$r, async=${r.isAsync}, origin=$term")
+                             cpsCtx.log(s"runRoot: r=$r")
+                             cpsCtx.log(s"runRoot: origin=$term")
+                             cpsCtx.log(s"runRoot: marker=$marker, async=${r.isAsync}")
                         r
                       case _ =>
                         throw MacroError("Can't determinate exact type for term", expr)
@@ -79,7 +93,7 @@ trait RootTreeTransform[F[_], CT]:
            runRoot(qual, TransformationContextMarker.Select, muted) match 
               case rq: AsyncCpsTree =>
                   val cTransformed = rq.transformed.asInstanceOf[qctx.reflect.Term]
-                  CpsTree.impure(Select(cTransformed,term.symbol),term.tpe)
+                  CpsTree.impure(Select(cTransformed,term.symbol),term.tpe.widen)
               case _: PureCpsTree =>
                   CpsTree.pure(term)
        case Ident(name) =>
@@ -105,12 +119,19 @@ trait RootTreeTransform[F[_], CT]:
      r
   }
 
-  def exprToTree(expr: CpsExpr[F,_], e: Term): CpsTree =
-     if (expr.isAsync)
-         val transformed = expr.transformed.asTerm
-         AwaitSyncCpsTree(transformed, e.tpe)
-     else
-         PureCpsTree(e)
+  def exprToTree[T](expr: CpsExpr[F,T], e: Term): CpsTree =
+     expr.syncOrigin match
+       case Some(origin) => 
+            PureCpsTree(origin.asTerm, expr.isChanged)
+       case None => 
+           val transformed = expr.transformed.asTerm
+           AwaitSyncCpsTree(transformed, e.tpe.widen)
+     
+     //if (expr.isAsync)
+     //    val transformed = expr.transformed.asTerm
+     //    AwaitSyncCpsTree(transformed, e.tpe.widen)
+     //else
+         //PureCpsTree(e)
 
   object B2{
 

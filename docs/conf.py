@@ -19,11 +19,11 @@
 # -- Project information -----------------------------------------------------
 
 project = 'dotty-cps-async'
-copyright = '2020, Ruslan Shevchenko'
+copyright = '2020-2021, Ruslan Shevchenko'
 author = 'Ruslan Shevchenko'
 
 # The full version, including alpha/beta/rc tags
-release = '0.2.0'
+release = '0.6.0-SNAPSHOT'
 
 
 # -- General configuration ---------------------------------------------------
@@ -33,6 +33,7 @@ release = '0.2.0'
 # ones.
 extensions = [
  'recommonmark',
+ 'sphinx.ext.autosectionlabel',
 ]
 
 # Add any paths that contain templates here, relative to this directory.

@@ -42,12 +42,15 @@ trait ApplyTreeTransform[F[_],CT]:
             handleFun(applyTerm, fun, args, tails)
      if (cpsCtx.flags.debugLevel > 15)
        cpsCtx.log(s"runApply result = ${r}")
-       cpsCtx.log(s"runApply result transformed = ${r.transformed.show}")
+       cpsCtx.log(s"runApply result transformed = ${safeShow(r.transformed)}")
      r
 
   def sameSelect(funTerm:Term, name:String, targs:List[TypeTree], args:List[Term]):Option[Term] =
-      funTerm.symbol.memberMethod(name) match
-        case None => None
+      if (cpsCtx.flags.debugLevel >= 15 && name=="apply")
+          println(s"sameSelect: funTerm=${funTerm}")
+          println(s"sameSelect: funTerm.tpe.typeSymbol=${funTerm.tpe.typeSymbol}")
+      funTerm.tpe.typeSymbol.memberMethod(name) match
+        case Nil => None
         case m::Nil =>
            val select = Select.unique(funTerm, name)
            if (targs.isEmpty)
@@ -60,8 +63,6 @@ trait ApplyTreeTransform[F[_],CT]:
               case other =>
                 throw MacroError("expected that Select.overloaded should match apply", posExprs(other,funTerm))
            
-     
-
 
   /**
    *applyTerm = Apply(fun, args)
@@ -98,15 +99,17 @@ trait ApplyTreeTransform[F[_],CT]:
                           sameSelect(shifted, method, targs, args) match 
                             case None =>
                                // not-found, use origin
-                               val cpsObj = cpsObj1.monadMap(x => TypeApply(Select(x,obj.symbol),targs), fun.tpe)
+                               val cpsObj = cpsObj1.select(obj, obj.symbol, obj.tpe).typeApply(fun, targs, fun.tpe)
                                handleArgs1(applyTerm, fun, cpsObj, args, tails)
                             case Some(term) =>
+                               // for now, will check both term and tree. TODO build CpsTree in sameSelect
                                handleArgs1(applyTerm, term, CpsTree.pure(term, isChanged=true), args, tails, unpure=true)
                  case _ =>
-                     val cpsObj = cpsObj1.monadMap(x => TypeApply(Select(x,obj.symbol),targs), fun.tpe)
+                     val cpsObj = cpsObj1.select(obj, obj.symbol, obj.tpe).typeApply(fun, targs, fun.tpe)
                      handleArgs1(applyTerm, fun, cpsObj, args, tails)
           else if (cpsObj1.isChanged)
-              val cpsObj = cpsObj1.applyTerm1(x=>TypeApply(Select(x,obj.symbol),targs), fun.tpe)
+              //val cpsObj = cpsObj1.applyTerm1(x=>TypeApply(Select(x,obj.symbol),targs), fun.tpe)
+              val cpsObj = cpsObj1.select(obj, obj.symbol, obj.tpe).typeApply(fun, targs, fun.tpe)
               handleArgs1(applyTerm, fun, cpsObj, args, tails)
           else
               handleArgs1(applyTerm, fun, CpsTree.pure(fun), args, tails)
@@ -129,7 +132,7 @@ trait ApplyTreeTransform[F[_],CT]:
        if (cpsCtx.flags.debugLevel >= 15)
           cpsCtx.log(s"obj=${obj}")
      obj match
-       case Inlined(_,_,
+       case conv@Inlined(_,_,
               Typed(
                  Lambda(List(xValDef),
                    Block(List(),Apply(Apply(TypeApply(obj3,targs3),List(x)),args1))),
@@ -139,7 +142,15 @@ trait ApplyTreeTransform[F[_],CT]:
                   // here we catch await, inserted by implicit conversion.
                   // this code is likey depends from implementation details of a compiler
                   // mb create compiler-level API ?
-                  runAwait(applyTerm, args.head, targs3.head.tpe, args1.head)
+                  withInlineBindings(conv, runAwait(applyTerm, args.head, targs3.head.tpe, args1.head))
+       case conv@Inlined(_,_,
+                 Lambda(List(xValDef),
+                   Block(List(),Apply(Apply(TypeApply(obj3,targs3),List(x)),args1)))
+            ) if (obj3.symbol == awaitSymbol
+                   && xValDef.symbol == x.symbol) =>
+                  // transient inlines have no 'Typed' entry
+                  //  TODO: handle non-inlined conversion
+                  withInlineBindings(conv,runAwait(applyTerm, args.head, targs3.head.tpe, args1.head))
        case _ =>
          val cpsObj = runRoot(obj, TCM.ApplySelect)
          if (cpsCtx.flags.debugLevel >= 15)
@@ -148,24 +159,32 @@ trait ApplyTreeTransform[F[_],CT]:
             case lt: AsyncLambdaCpsTree =>
                if (cpsCtx.flags.debugLevel >= 15)
                   cpsCtx.log(s"funSelect: AsyncLambdaCpsTree discovered, fun=$fun fun.tpe=${fun.tpe}")
-               handleArgs1(applyTerm, fun, cpsObj.select(fun.symbol, fun.tpe), args, tails)
+               handleArgs1(applyTerm, fun, cpsObj.select(fun, fun.symbol, fun.tpe), args, tails)
             case cls: CallChainSubstCpsTree =>
                if (cpsCtx.flags.debugLevel >= 15)
                   cpsCtx.log(s"funSelect: CallChainSubstCpsTree discovered, fun=$fun fun.tpe=${fun.tpe}")
+                  cpsCtx.log(s"funSelect: cls.shifted = ${cls.shifted.show}")
                sameSelect(cls.shifted, methodName, List.empty, args) match 
-                  case None => val cpsObj1 = cpsObj.monadMap(x => Select(x,fun.symbol), fun.tpe)
+                  case None => 
+                               if (cpsCtx.flags.debugLevel >= 15) then
+                                  cpsCtx.log(s"not found name ${methodName} for ${cls.shifted.show}")
+                               val cpsObj1 = cpsObj.select(fun,fun.symbol, fun.tpe)
                                handleArgs1(applyTerm, fun, cpsObj1, args, tails)
-                  case Some(term) => val cpsObj1 = CpsTree.pure(term, isChanged = true)
+                  case Some(term) => 
+                               if (cpsCtx.flags.debugLevel >= 15) then
+                                  cpsCtx.log(s"found sameSelect: ${term.show} ")
+                               val cpsObj1 = CpsTree.pure(term, isChanged = true)
                                handleArgs1(applyTerm, fun, cpsObj1, args, tails, unpure=true)
             case _ =>
                if (cpsCtx.flags.debugLevel >= 15)
                   cpsCtx.log(s"funSelect: ! lambda || Subst, fun=$fun fun.tpe=${fun.tpe}")
-               if (cpsObj.isAsync)
-                   handleArgs1(applyTerm, fun,
-                        cpsObj.monadMap(x => Select(x,fun.symbol), fun.tpe), args, tails)
-               else
-                  handleArgs1(applyTerm, fun, cpsObj.select(fun.symbol, fun.tpe), args, tails)
+               handleArgs1(applyTerm, fun, cpsObj.select(fun, fun.symbol, fun.tpe), args, tails)
 
+  def withInlineBindings(origin: Inlined, tree:CpsTree):CpsTree =
+        if (origin.bindings.isEmpty)
+           tree
+        else
+           InlinedCpsTree(origin, origin.bindings, tree)
 
   def handleFunIdent(applyTerm: Term, fun:Term, args:List[Term], name: String, tails: List[Seq[ApplyArgRecord]]):CpsTree =
         handleArgs1(applyTerm, fun, CpsTree.pure(fun), args, tails)
@@ -315,17 +334,6 @@ trait ApplyTreeTransform[F[_],CT]:
         }
   }
 
-  // TODO: remove
-  def haveAsyncLambdaInArgs(args:List[Term]):Boolean =
-     args.exists{ x =>
-       x match
-          case Lambda(largs,body) => TransformUtil.containsAwait(body)
-          case Repeated(rargs,tpt) => haveAsyncLambdaInArgs(rargs)
-          case _ => false
-     }
-
-  def findAsyncShift[E:quoted.Type](e:Expr[E]):Option[Expr[AsyncShift[E]]] =
-    Expr.summon[AsyncShift[E]]
 
   def findAsyncShiftTerm(e:Term):ImplicitSearchResult =
     val tpe = e.tpe.widen
@@ -333,67 +341,176 @@ trait ApplyTreeTransform[F[_],CT]:
     val tpTree = asyncShift.appliedTo(tpe)
     Implicits.search(tpTree)
 
-  def findObjectAsyncShiftTerm(e:Term):ImplicitSearchResult =
-    val tpe = e.tpe.widen
-    val objAsyncShift = TypeIdent(Symbol.classSymbol("cps.ObjectAsyncShift")).tpe
-    val tpTree = objAsyncShift.appliedTo(tpe)
-    //val tpTree = Type.of[ObjectAsyncShift].appliedTo(tpe).simplified
-    if cpsCtx.flags.debugLevel >= 15 then
-      cpsCtx.log(s"searchImplicits: tpTree=$tpTree")
-      cpsCtx.log(s"tpe=$tpe")
-      cpsCtx.log(s"Type.of[ObjectAsyncShift]=${TypeRepr.of[ObjectAsyncShift]}")
-    Implicits.search(tpTree)
 
 
-  def shiftedApply(term: Term, originArgs:List[Term], shiftedArgs: List[Term], shiftedIndexes:Set[Int]): Term =
+  def shiftedApplyCps(
+                      cpsTree: CpsTree, 
+                      originArgs:List[Term], 
+                      shiftedArgs: List[Term], 
+                      shiftedIndexes:Set[Int], //TODO: this should be List[Set[Int]]
+                      shiftedTails: List[List[Term]],
+                      applyTerm: Term): CpsTree =
+
+    def condTypeApply(sel:Term, targs: List[TypeTree]):Term =
+      if (targs.isEmpty) sel else TypeApply(sel,targs)
+
+    cpsTree.syncOrigin match
+      case Some(origin) =>
+        val head = shiftedApplyTerm(origin, originArgs, shiftedArgs, shiftedIndexes)
+        shiftedResultCpsTree(applyTerm, head.appliedToArgss(shiftedTails))
+      case None =>
+        cpsTree match
+           case PureCpsTree(origin, _) => 
+              // impossible
+              val head = shiftedApplyTerm(origin, originArgs, shiftedArgs, shiftedIndexes)
+              shiftedResultCpsTree(applyTerm, head.appliedToArgss(shiftedTails))
+           case SelectTypeApplyCpsTree(optOrigin,nested,targs,selects,otpe, changed) =>
+              if (selects.isEmpty) then
+                 if (targs.isEmpty) then
+                   shiftedApplyCps(nested,originArgs,shiftedArgs,shiftedIndexes,shiftedTails,applyTerm)
+                 else
+                   // this can be only generice async-lambda
+                   //  which is impossible to create in scala syntax
+                   throw MacroError("can't shift async head: ${cpsTree}", posExprs(applyTerm))
+              else
+                 val current = selects.head
+                 val prevSelects = selects.tail
+                 val prev = SelectTypeApplyCpsTree.create(optOrigin,nested,targs,prevSelects,current.prevTpe, changed)
+                 prev.monadFlatMap({x => 
+                       val funToShift = condTypeApply(Select(x,current.symbol),current.targs)
+                       val head = shiftedApplyTerm(funToShift,originArgs,shiftedArgs,shiftedIndexes)
+                       head.appliedToArgss(shiftedTails)
+                 }, applyTerm.tpe)
+           case lt@AsyncLambdaCpsTree(originLambda,params,body,otpe) =>
+              val head = shiftedApplyTerm(lt.rLambda, originArgs, shiftedArgs, shiftedIndexes)
+              shiftedResultCpsTree(applyTerm, head.appliedToArgss(shiftedTails))
+           case x: AsyncCpsTree =>
+              // this can be only function, so, try to call apply method
+              x.monadMap({fun =>
+                  val head = shiftedApplyTerm(Select.unique(fun,"apply"), originArgs, shiftedArgs, shiftedIndexes)
+                  head.appliedToArgss(shiftedTails)
+              }, applyTerm.tpe)
+           case BlockCpsTree(stats, last) =>
+                  BlockCpsTree(stats,shiftedApplyCps(last,originArgs,shiftedArgs,shiftedIndexes,
+                               shiftedTails, applyTerm))
+           case InlinedCpsTree(origin, bindings, nested) =>
+                  InlinedCpsTree(origin, bindings, shiftedApplyCps(nested, originArgs, shiftedArgs,
+                                         shiftedIndexes, shiftedTails, applyTerm))
+           case ValCpsTree(valDef, rightPart, nested, canBeLambda) =>
+                  ValCpsTree(valDef, rightPart, shiftedApplyCps(nested, originArgs, shiftedArgs,
+                                         shiftedIndexes, shiftedTails, applyTerm), canBeLambda)
+           case AppendCpsTree(frs, snd) =>
+                  AppendCpsTree(frs, 
+                      shiftedApplyCps(snd,originArgs,shiftedArgs,shiftedIndexes,shiftedTails,applyTerm))
+           case CallChainSubstCpsTree(origin, shifted, otpe) =>
+                  val head = shiftedApplyTerm(Select.unique(shifted,"apply"), originArgs, shiftedArgs, shiftedIndexes)
+                  shiftedResultCpsTree(applyTerm, head.appliedToArgss(shiftedTails))
+                  
+                  
+
+  def shiftedApplyTerm(term: Term, originArgs:List[Term], shiftedArgs: List[Term], shiftedIndexes:Set[Int]): Term =
 
     val monad = cpsCtx.monad.asTerm
+
+    def checkInplaceAsyncMethodCandidate(methodSym: Symbol, qual: Term, targs: List[TypeTree], args: List[Term]): Either[MessageWithPos,Boolean] =
+       val paramSymss = methodSym.paramSymss
+       val mPos = methodSym.pos.getOrElse(qual.pos)
+       if (paramSymss.isEmpty) then
+           Left(MessageWithPos(s"${methodSym.name} for qual=${qual} should have arguments",mPos))
+       else
+           val typeArgsShifted = paramSymss.head.filter(_.isType)
+           val nTypeArgsShifted = typeArgsShifted.length
+           val nTypeArgs = targs.length
+           if (nTypeArgs != nTypeArgsShifted) && (nTypeArgsShifted != nTypeArgs + 1) then 
+              Left(MessageWithPos(s" ${methodSym.name} for qual=${qual} number of type arguments is impossible",mPos))
+           else 
+              // TODO: additional check ?
+              Right(nTypeArgsShifted == nTypeArgs + 1)
+
+    def findInplaceAsyncMethodCall(x:Select, shiftedName: String, 
+                                  targs: List[TypeTree], args: List[Term]): Either[List[MessageWithPos],Term] =
+         val qual = x.qualifier
+
+         def withTargs(t:Term):Term =
+           if (targs.isEmpty) 
+             t
+           else 
+             TypeApply(t, targs)
+
+         qual.tpe.typeSymbol.memberMethod(shiftedName) match
+           case Nil =>
+             Left(List())
+           case m::Nil =>
+             checkInplaceAsyncMethodCandidate(m, qual, targs, args) match
+               case Left(error) => Left(List(error))
+               case Right(useExtraArgs) =>
+                 if (useExtraArgs)
+                   Right(Apply(TypeApply(Select.unique(qual,shiftedName), TypeTree.of[F]::targs), monad::args))
+                 else
+                   Right(Apply(withTargs(Select.unique(qual,shiftedName)), args))
+           case overloaded =>
+               var errors: List[MessageWithPos] = List.empty
+               var foundUseExtra: List[Symbol] = List.empty
+               var foundDirect: List[Symbol] = List.empty
+               var c = overloaded
+               while(!c.isEmpty) {
+                 val sym = c.head
+                 c = c.tail
+                 checkInplaceAsyncMethodCandidate(sym, qual, targs, args) match
+                   case Left(e) => errors = e::errors
+                   case Right(useExtra) =>
+                      if (useExtra)
+                        foundUseExtra = sym::foundUseExtra
+                      else
+                        foundDirect = sym::foundDirect
+               }
+               if (foundDirect.isEmpty) then
+                   if (foundUseExtra.isEmpty) then
+                      Left(errors)
+                   else
+                      // TODO: add retval to overload check
+                      Right(Select.overloaded(qual,shiftedName,TypeTree.of[F].tpe::targs.map(_.tpe), monad::args))
+               else 
+                   if (foundUseExtra.isEmpty) then
+                      Right(Select.overloaded(qual,shiftedName,targs.map(_.tpe), args))
+                   else
+                      // found both variants, can't choose ?
+                      Left(List(
+                        MessageWithPos("More than one candidate for overloaded variant for method $shiftedName, qual=${qual.show}",x.pos)
+                      ))
+            
+
 
     def shiftSelectTypeApplyApply(x:Select, targs:List[TypeTree], args: List[Term]): Term =
 
        val qual = x.qualifier
 
-       def withTargs(t:Term):Term =
-         if (targs.isEmpty) 
-           t
-         else 
-           TypeApply(t, targs)
 
+       def traceFunNotFound(msg:String, errors:List[MessageWithPos]): Unit =
+          if (!errors.isEmpty) then
+            report.warning(msg)
+            errors.foreach(e =>
+              report.warning(e.message)
+            )
 
-       if (qual.tpe <:< TypeRepr.of[cps.runtime.CallChainAsyncShiftSubst[F,?,?]]) then
-          val shiftedName = x.name + "_shifted"
-          qual.tpe.typeSymbol.memberMethod(shiftedName) match
-            case Nil  => 
-               throw MacroError(s"Can't find method ${shiftedName} for qual=${qual} ",posExpr(x))
-            case m::Nil =>
-               //withTargs(Select(qual,m))
-               Apply(withTargs(Select.unique(qual,shiftedName)), args)
-            case other =>
-               //TODO: possible overload in later args lists.
-               Select.overloaded(qual,shiftedName,targs.map(_.tpe), args) 
-       else
-         findObjectAsyncShiftTerm(qual) match
-           case success1: ImplicitSearchSuccess =>
-             val objectShift = success1.tree
-             if (cpsCtx.flags.debugLevel >= 15)
-               cpsCtx.log(s"found objectShift, ${success1.tree}")
-               cpsCtx.log(s"objectShift.tpe = ${objectShift.tpe}")
-             val shiftedExpr = Apply(
-                               TypeApply(Select.unique(objectShift, "apply"),TypeTree.of[F]::Nil),
-                               List(qual,monad)
-                             )
-             val newSelect = Select.unique(shiftedExpr, x.name)
-             Apply(withTargs(newSelect), args)
-           case failure1: ImplicitSearchFailure =>
-             findAsyncShiftTerm(qual) match
-               case success2: ImplicitSearchSuccess =>
-                 val shiftType = success2.tree.tpe
-                 val shiftSymbol = if (shiftType.isSingleton) {
+       val shiftedName = x.name + "_async"  
+       findInplaceAsyncMethodCall(x, shiftedName,  targs, args) match
+         case Right(t) => t
+         case Left(funErrors) => 
+           val funErrors0 = funErrors
+           val shiftedName1 = x.name + "Async"
+           findInplaceAsyncMethodCall(x, shiftedName1,  targs, args) match
+             case Right(t) => t
+             case Left(funErrors) =>
+               findAsyncShiftTerm(qual) match
+                 case success2: ImplicitSearchSuccess =>
+                   val shiftType = success2.tree.tpe
+                   val shiftSymbol = if (shiftType.isSingleton) {
                                      shiftType.termSymbol
                                    } else {
                                      shiftType.typeSymbol
                                    }
-                 shiftSymbol.memberMethod(x.name) match
+                   shiftSymbol.memberMethod(x.name) match
                     case Nil =>
                         throw MacroError(s"Method (${x.name}) is not defined in [${shiftType.show}], qual=${qual} ",posExpr(x))
                     case m::Nil =>
@@ -405,8 +522,14 @@ trait ApplyTreeTransform[F[_],CT]:
                         val shiftedCaller = Select.overloaded(success2.tree, x.name, (TypeTree.of[F]::targs).map(_.tpe), List(qual,monad), expectedType)
                         Apply(shiftedCaller, args)
                              
-               case failure2: ImplicitSearchFailure =>
-                 throw MacroError(s"Can't find AsyncShift (${failure2.explanation}) or ObjectAsyncShift (${failure1.explanation}) for qual=${qual} ",posExpr(x))
+                 case failure2: ImplicitSearchFailure =>
+                   traceFunNotFound(s"failed candidates for ${qual.show} ${shiftedName}",funErrors)
+                   if cpsCtx.flags.debugLevel >= 15 then
+                      for((a,i) <- args.zipWithIndex) {
+                        cpsCtx.log(s"arg($i)=${a.show}")
+                      }
+                   throw MacroError(s"Can't find AsyncShift (${failure2.explanation}) or async functions) for qual=${qual} name = ${x.name}, shiftedName=${shiftedName}",posExpr(x))
+
 
 
     if (cpsCtx.flags.debugLevel >= 15)
@@ -432,7 +555,8 @@ trait ApplyTreeTransform[F[_],CT]:
        //           Apply(TypeApply(shiftCaller(x),targs),args)
        case Apply(x, args1) =>
                   // TODO: shift args
-                  Apply(shiftedApply(x,args1,args1,Set()),shiftedArgs)
+                  ???
+                  //Apply(shiftedApply(x,args1,args1,Set()),shiftedArgs)
        case Lambda(params, body) =>
                   val shiftedSymbols = params.zipWithIndex.filter{
                       (p,i) => shiftedIndexes.contains(i)
@@ -440,12 +564,17 @@ trait ApplyTreeTransform[F[_],CT]:
                   val nBody = asyncShift(body, shiftedSymbols)
                   ???
        case Block(statements, last) =>
-                  Block(statements, shiftedApply(last, originArgs, shiftedArgs, shiftedIndexes))
+                  // TODO: change cpsFun appropriative
+                  Block(statements, shiftedApplyTerm(last, originArgs, shiftedArgs, shiftedIndexes))
        case _ =>
-                  val errorExpr = posExpr(term)
-                  throw MacroError(s"Can't shift caller ${term}",errorExpr)
+                  report.warning(s"""
+                     Need to shift $term, tpe.widen=${term.tpe.widen} 
+                     originArgs=${originArgs}
+                     shiftedArgs=${shiftedArgs}
+                  """, posExprs(term))
+                  throw MacroError(s"Can't shift caller ${term}",posExprs(term))
 
-  end shiftedApply
+  end shiftedApplyTerm
 
   def buildApply(cpsFun: CpsTree, fun: Term,
                  argRecords: Seq[ApplyArgRecord],
@@ -457,19 +586,10 @@ trait ApplyTreeTransform[F[_],CT]:
                  ): CpsTree =
         if (cpsCtx.flags.debugLevel >= 15)
             cpsCtx.log(s"buildApply: fun=${safeShow(fun)}")
-            cpsCtx.log(s"cpsFun.isSync=${cpsFun.isSync}, withShiftedLambda=${withShiftedLambda}, inShiftedCallChain=${inShiftedCallChain}")
+            cpsCtx.log(s"buildApply: cpsFun.isSync=${cpsFun.isSync}, withShiftedLambda=${withShiftedLambda}, inShiftedCallChain=${inShiftedCallChain}")
         val applyTpe = applyTerm.tpe
         if (withShiftedLambda)
-          if (cpsFun.isSync || inShiftedCallChain)
-            val shifted = buildShiftedApply(fun, argRecords, withAsync, tails)
-            if (cpsCtx.flags.debugLevel >= 15)
-               cpsCtx.log(s"buildApply: shifted=${safeShow(shifted)}")
-            shiftedResultCpsTree(applyTerm, shifted)
-          else
-            //val sym = Symbol.newVal(Symbol.currentOwner, "x", t.widen, Flags.EmptyFlags, Symbol.noSymbol)   
-            //val shifted = buildShiftedApply(Ref(x), argRecords, withAsync, tails)
-            // TODO: monadFlatMap should accept lambda-expression
-            cpsFun.monadFlatMap(v => buildShiftedApply(v,argRecords, withAsync, tails), applyTpe)
+          buildShiftedApply(cpsFun, fun, argRecords, withAsync, tails, applyTerm)
         else
           val args = argRecords.map(_.identArg(withAsync)).toList
           val tailArgss = tails.map(_.map(_.identArg(withAsync)).toList)
@@ -507,6 +627,9 @@ trait ApplyTreeTransform[F[_],CT]:
              throw MacroError("Async function with arity != 1 is not supported yet",posExprs(shifted,origin))
       else if (shifted.tpe <:< TypeRepr.of[cps.runtime.CallChainAsyncShiftSubst[F,?,?]]) 
          CallChainSubstCpsTree(origin, shifted, origin.tpe)
+      else if (shifted.tpe.widen =:= origin.tpe.widen) 
+         // experimental, when shifted result type is the same as result type.
+         CpsTree.pure(shifted, isChanged=true)
       else
          CpsTree.impure(shifted, origin.tpe)
 
@@ -514,23 +637,22 @@ trait ApplyTreeTransform[F[_],CT]:
 
 
   def buildShiftedApply(
+                        cpsFun: CpsTree,
                         fun: Term,
                         argRecords:Seq[ApplyArgRecord],
                         withAsync: Boolean,
-                        tails:List[Seq[ApplyArgRecord]]): Term =
+                        tails:List[Seq[ApplyArgRecord]],
+                        applyTerm:Term ): CpsTree =
       val shiftedIndexes = argRecords.zipWithIndex.filter(_._1.hasShiftedLambda).map(_._2)
       val shiftedArgs = argRecords.map(_.shift().identArg(withAsync)).toList
       val originArgs = argRecords.map(_.term).toList
       if (cpsCtx.flags.debugLevel >= 15)
+          cpsCtx.log(s"buildShiftedApply::fun=${fun}")
           cpsCtx.log(s"buildShiftedApply::argRecords=${argRecords}")
           cpsCtx.log(s"buildShiftedApply::shiftedArgs=${shiftedArgs}")
           cpsCtx.log(s"buildShiftedApply::tails=${tails}")
-      val shiftedApplyHead = shiftedApply(fun, originArgs, shiftedArgs, shiftedIndexes.toSet)
       val shiftedTails = tails.map(_.map(_.shift().identArg(withAsync)).toList)
-      val r = shiftedApplyHead.appliedToArgss(shiftedTails)
-      if (cpsCtx.flags.debugLevel >= 15)
-          cpsCtx.log(s"buildShiftedApply::r.tpe=${r.tpe}")
-      r
+      shiftedApplyCps(cpsFun, originArgs, shiftedArgs, shiftedIndexes.toSet, shiftedTails, applyTerm)
 
 
 object ApplyTreeTransform:

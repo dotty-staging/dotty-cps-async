@@ -100,19 +100,24 @@ trait CpsTryMonad[F[_]] extends CpsMonad[F] {
 
 
 /**
- * Monad, interpolable with Future.
+ * Interoperability with Future:
+ * allows  async[F]{ .. await[Future](..) ... }
  **/
 trait CpsAsyncMonad[F[_]] extends CpsTryMonad[F] {
 
    /**
     * called by the source, which accept callback.
-    * source is called immediatly in adoptCallbackStyle
+    * source is called immediately in adoptCallbackStyle
     **/
    def adoptCallbackStyle[A](source: (Try[A]=>Unit) => Unit): F[A]
 
 }
 
 
+/**
+ * Interoperability with Future:
+ * allows  async[F]{ .. await[Future](..) ... }
+ **/
 trait CpsSchedulingMonad[F[_]] extends CpsAsyncMonad[F] {
 
 

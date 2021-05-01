@@ -40,16 +40,6 @@ class TestBS1ShiftEither:
      }
      assert(c.run() == Success(true))
 
-  @Test def testTryGetOrElse0(): Unit = 
-     //implicit val printCode = cps.macroFlags.PrintCode
-     //implicit val debugLevel = cps.macroFlags.DebugLevel(20)
-     val c = async[ComputationBound]{
-        val a: Try[Int] = Success(0)
-        a.getOrElse{
-            await(T1.cbi(2))
-        }
-     }
-     assert(c.run() == Success(0))
 
 
 

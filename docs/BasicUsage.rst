@@ -1,32 +1,33 @@
 Dependency
 ===========
 
-The current prerelease is 0.3.4-M2 for using with scala3-3.0.0-M2.
+The current prerelease is 0.6.2 for using with scala3-3.0.0-RC3.
 
  .. code-block:: scala
 
-   scalaVersion := "3.0.0-M2"
-   libraryDependencies += "com.github.rssh" %% "dotty-cps-async" % "0.3.4-M2"
+   scalaVersion := "3.0.0-RC3"
+   libraryDependencies += "com.github.rssh" %% "dotty-cps-async" % "0.6.2"
 
 for JVM-projects. JavaScript also supported.
 
  .. code-block:: scala
 
-   libraryDependencies += "com.github.rssh" %%% "dotty-cps-async" % "0.3.4-M2"
+   libraryDependencies += "com.github.rssh" %%% "dotty-cps-async" % "0.6.2"
 
 
-Previous version is for 3.0.0-M1:
+Previous version is for 3.0.0-RC2:
 
  .. code-block:: scala
 
-   scalaVersion := "3.0.0-M1"
-   libraryDependencies += "com.github.rssh" %% "dotty-cps-async" % "0.3.3-M1"
+   scalaVersion := "3.0.0-RC2"
+   libraryDependencies += "com.github.rssh" %% "dotty-cps-async" % "0.5.0"
 
 
 Basic Usage
 ===========
 
-Usage is obvious: we have two 'pseudo-functions' ``async`` and ``await`` [#f1]_ : 
+The usage is quite similar to working with async/await frameworks in Scala2 and other languages.
+We have two 'pseudo-functions' ``async`` and ``await`` [#f1]_ : 
 
  .. index:: async
  .. index:: await

@@ -53,9 +53,13 @@ given FutureAsyncMonad(using ExecutionContext): CpsSchedulingMonad[Future] with
 
    def executionContext = summon[ExecutionContext]
 
-object FutureAsyncMonad:
 
-   given ImplicitAwait: cps.features.implicitAwait.IsPossible[Future] with {}
+
+
+given cps.automaticColoring.WarnValueDiscard[Future] with {}
+
+
+given CpsMonadDefaultMemoization[Future] with {}
 
 
 given fromFutureConversion[G[_]](using ExecutionContext, CpsAsyncMonad[G]): CpsMonadConversion[Future,G] =

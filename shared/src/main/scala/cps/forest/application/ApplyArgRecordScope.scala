@@ -110,7 +110,7 @@ trait ApplyArgRecordScope[F[_], CT]:
 
 
   case class ApplyArgLambdaRecord(
-       term: Block,   // Lambda,  see coding of Lambda in Tasty Reflect.
+       term: Term,   // Lambda,  see coding of Lambda in Tasty Reflect.
        index: Int,
        cpsBody: CpsTree,
        shifted: Boolean
@@ -131,18 +131,24 @@ trait ApplyArgRecordScope[F[_], CT]:
               case Lambda(params, body) => (params, body)
               case _ =>
                  throw MacroError(s"Lambda expexted, we have ${term.asExpr.show}",term.asExpr)
-            term.tpe match
-              case MethodType(paramNames, paramTypes, resType) =>
-                  val mt = shiftedMethodType(paramNames, paramTypes, resType)
-                  createAsyncLambda(mt, params)
-              case ft@AppliedType(tp,tparams) =>
+            shiftedArgExpr(existsAsync, term.tpe, params, body)
+         else
+            term
+
+
+       def shiftedArgExpr(existsAsync:Boolean, identType: TypeRepr, params: List[ValDef], body:Term): Term =
+         identType match
+            case MethodType(paramNames, paramTypes, resType) =>
+                val mt = shiftedMethodType(paramNames, paramTypes, resType)
+                createAsyncLambda(mt, params, Symbol.spliceOwner)
+            case ft@AppliedType(tp,tparams) =>
                   if (ft.isFunctionType) {
                       //val paramTypes = tparams.dropRight(1).map(typeOrBoundsToType(_,false))
                       val paramTypes = tparams.dropRight(1)
                       val resType = tparams.last
                       val paramNames = params.map(_.name)
                       val mt = shiftedMethodType(paramNames, paramTypes, resType)
-                      createAsyncLambda(mt, params)
+                      createAsyncLambda(mt, params, Symbol.spliceOwner)
                   } else if (tp <:< partialFunctionType ) {
                       val (tIn, tOut) = tparams match
                          case tIn::tOut::Nil => (tIn, tOut)
@@ -156,15 +162,15 @@ trait ApplyArgRecordScope[F[_], CT]:
                   } else {
                       throw MacroError(s"FunctionType expected, we have ${tp}", term.asExpr)
                   }
-              case other =>
+            case at@AnnotatedType(underlying,anon) =>
+                  shiftedArgExpr(existsAsync, underlying, params, body)
+            case other =>
                   // TODO: logging compiler interface instead println
                   println(s"MethodType expected, we have ${term.tpe}")
                   println(s"term.show = ${term.show}")
                   println(s"term.body = ${term}")
                   println(s"mt = ${other}")
                   throw MacroError(s"methodType expected for ${term.asExpr.show}, we have $other",term.asExpr)
-         else
-            term
 
        def shift(): ApplyArgRecord = copy(shifted=true)
 
@@ -193,7 +199,7 @@ trait ApplyArgRecordScope[F[_], CT]:
                                wasDefault: Boolean):List[CaseDef]=
               rest match
                 case h::t =>
-                     val nh = rebindCaseDef(h, Literal(BooleanConstant(true)), Map.empty, false)
+                     val nh = rebindCaseDef(h, Literal(BooleanConstant(true)), Map.empty, false, Symbol.spliceOwner)
                      transformCases(t, nh::acc, wasDefault)
                 case Nil =>
                       val lastCase = casePattern match
@@ -207,13 +213,6 @@ trait ApplyArgRecordScope[F[_], CT]:
             Match.copy(body)(inputVal, transformCases(body.cases,Nil,false))
             //Match(inputVal, transformCases(body.cases,Nil,false))
 
-         def newCheck(): Term =
-            val mt = MethodType(paramNames)(_ => List(fromType), _ => TypeRepr.of[Boolean])
-            Lambda(Symbol.spliceOwner, mt, (owner,args) => changeArgs(params,args,newCheckBody(matchVar)).changeOwner(owner))
-
-         def newBody():Term =
-            val mt = MethodType(paramNames)( _ => List(fromType), _ => toInF)
-            createAsyncLambda(mt, params)
 
          def termCast[E:Type](term: Term): Expr[E] =
             term.asExprOf[E]
@@ -232,7 +231,7 @@ trait ApplyArgRecordScope[F[_], CT]:
                                case m@Match(scr,caseDefs) =>
                                  val b0 = Map(matchVar.symbol -> 'x2.asTerm)
                                  val nCaseDefs = caseDefs.map( cd =>
-                                                    rebindCaseDef(cd, cd.rhs, b0, true))
+                                                    rebindCaseDef(cd, cd.rhs, b0, true, Symbol.spliceOwner))
                                  val nTerm = Match('x2.asTerm, nCaseDefs)
                                  termCast(nTerm)
                                case _ =>
@@ -250,14 +249,16 @@ trait ApplyArgRecordScope[F[_], CT]:
 
          r
 
-       private def createAsyncLambda(mt: MethodType, params: List[ValDef]): Term =
+       private def createAsyncLambda(mt: MethodType, params: List[ValDef], owner: Symbol): Term =
          val transformedBody = cpsBody.transformed
-         Lambda(Symbol.spliceOwner,mt, (owner,args) => changeArgs(params,args,transformedBody).changeOwner(owner))
+         Lambda(owner, mt, (owner,args) => changeArgs(params,args,transformedBody,owner).changeOwner(owner))
 
        private def rebindCaseDef(caseDef:CaseDef,
                                  body: Term,
                                  assoc: Map[Symbol, Term],
-                                 processBody: Boolean): CaseDef = {
+                                 processBody: Boolean,
+                                 owner: Symbol): CaseDef = {
+
 
          def rebindPatterns(pattern: Tree, map:Map[Symbol,Term]): (Tree, Map[Symbol, Term]) = {
            pattern match
@@ -280,23 +281,24 @@ trait ApplyArgRecordScope[F[_], CT]:
          }
 
          val (nPattern, newBindings) = rebindPatterns(caseDef.pattern, assoc)
-         val nGuard = caseDef.guard.map( changeSyms(newBindings, _ ) )
-         val nBody = if (processBody) changeSyms(newBindings, body) else body
+         val nGuard = caseDef.guard.map( changeSyms(newBindings, _, owner ) )
+         val nBody = if (processBody) changeSyms(newBindings, body, owner) else body
          CaseDef(nPattern, nGuard, nBody)
        }
 
-       private def changeArgs(params:List[ValDef], nParams:List[Tree], body: Term): Term =
+       private def changeArgs(params:List[ValDef], nParams:List[Tree], body: Term, owner: Symbol): Term =
          val association: Map[Symbol, Tree] = (params zip nParams).foldLeft(Map.empty){
              case (m, (oldParam, newParam)) => m.updated(oldParam.symbol, newParam)
          }
-         changeSyms(association, body)
+         changeSyms(association, body, owner: Symbol)
 
-       private def changeIdent(body:Term, oldSym: Symbol, newSym: Symbol): Term =
-         changeSyms(Map(oldSym->Ref(newSym)), body)
+       private def changeIdent(body:Term, oldSym: Symbol, newSym: Symbol, owner: Symbol): Term =
+         changeSyms(Map(oldSym->Ref(newSym)), body, owner)
 
-       private def changeSyms(association: Map[Symbol,Tree], body: Term): Term =
+       private def changeSyms(association: Map[Symbol,Tree], body: Term, owner: Symbol): Term =
          if  cpsCtx.flags.debugLevel >= 20 then
              cpsCtx.log(s"changeSyms, association = $association")
+
          val changes = new TreeMap() {
 
              def lookupParamTerm(symbol:Symbol): Option[Term] =
@@ -307,6 +309,13 @@ trait ApplyArgRecordScope[F[_], CT]:
                       case _ => throw MacroError(s"term expected for lambda param, we have ${paramTree}",posExprs(term))
                   case _ => None
 
+             override def transformTree(tree: Tree)(owner: Symbol): Tree =
+                tree match
+                  case pattern: Bind =>
+                    Bind.copy(pattern)(pattern.name, transformTree(pattern.pattern)(owner))
+                  case _ =>
+                    super.transformTree(tree)(owner)
+
              override def transformTerm(tree:Term)(owner: Symbol):Term =
                tree match
                  case ident@Ident(name) => lookupParamTerm(ident.symbol) match
@@ -316,7 +325,7 @@ trait ApplyArgRecordScope[F[_], CT]:
                                                               cpsCtx.log(s"oldHashcode: ${ident.symbol.hashCode}, new Hash: ${paramTerm.symbol.hashCode}")
                                                               cpsCtx.log(s"oldOwner: ${ident.symbol.owner} , newOwner: ${paramTerm.symbol.owner}")
                                                               cpsCtx.log(s"oldOwner.hashCode: ${ident.symbol.owner.hashCode} , newOwner.hashCode: ${paramTerm.symbol.owner.hashCode}")
-                                                          paramTerm
+                                                          paramTerm.changeOwner(owner)
                                              case None => super.transformTerm(tree)(owner)
                  case _ => super.transformTerm(tree)(owner)
 
@@ -331,6 +340,8 @@ trait ApplyArgRecordScope[F[_], CT]:
                            Annotated.copy(a)(transformTypeTree(tp)(owner),transformTerm(annotation)(owner))
                  case i@Inferred() =>
                            Inferred(transformType(i.tpe)(owner))
+                 case t:TypeSelect =>
+                           TypeSelect.copy(t)(transformTerm(t.qualifier)(owner),t.name)
                  case _ => super.transformTypeTree(tree)(owner)
 
              def transformType(tp: TypeRepr)(owner: Symbol): TypeRepr =
@@ -340,10 +351,14 @@ trait ApplyArgRecordScope[F[_], CT]:
                          lookupParamTerm(tref.termSymbol) match
                            case Some(paramTerm) => paramTerm.tpe
                            case None => tp
-                 case tp: TypeRef =>
-                         // it is impossible to create typeRef, so pass is itself
-                         // TODO: add constructor to CompilerReflection
-                         tp
+                 case tp@TypeRef(internal, name) =>
+                         internal match
+                           case tr: TermRef =>
+                              val ref = lookupParamTerm(tr.termSymbol).getOrElse(Ref(tr.termSymbol))
+                              TypeSelect(ref,name).tpe
+                           case _ =>
+                            // we can't get inside, since it is
+                              tp 
                  case SuperType(thisTpe,superTpe) =>
                          SuperType(transformType(thisTpe)(owner),transformType(superTpe)(owner))
                  case Refinement(parent,name,info) =>
@@ -361,12 +376,9 @@ trait ApplyArgRecordScope[F[_], CT]:
                  case ParamRef(x, index) => tp  //transform tp ?
                  case NoPrefix() => tp
                  case TypeBounds(low,hi) => TypeBounds(transformType(low)(owner),transformType(hi)(owner))
-                 case _ => tp  //  hope nobody will put termRef inside recursive type
-
-
+                 case _ => tp
          }
-         changes.transformTerm(body)(Symbol.spliceOwner)
-
+         changes.transformTerm(body)(owner)
   }
 
   case class ApplyArgNamedRecord(term: NamedArg, name: String, nested: ApplyArgRecord )
@@ -383,31 +395,12 @@ trait ApplyArgRecordScope[F[_], CT]:
 
   }
 
-  case class ApplyArgInlinedRecord(origin: Inlined, nested: ApplyArgRecord )
-     extends ApplyArgRecord {
-       def index: Int = nested.index
-       def term: Term =
-             Inlined(origin.call, origin.bindings, nested.term)
-       def hasShiftedLambda: Boolean = nested.hasShiftedLambda
-       def isAsync: Boolean = nested.isAsync
-       def noOrderDepended = nested.noOrderDepended
-       def identArg(existsAsync:Boolean): Term = nested.identArg(existsAsync)
-       def shift(): ApplyArgRecord = copy(nested=nested.shift())
-       def append(a: CpsTree): CpsTree =
-             val na = nested.append(a)
-             if (na eq a)
-                a
-             else
-                InlinedCpsTree(origin, na)
-
-
-  }
 
 
   case class ApplyArgByNameRecord(term: Term,
                                   index: Int,
                                   cpsTree: CpsTree,
-                                  shifted: Boolean) extends ApplyArgRecord:
+                                  shifted: Boolean) extends ApplyArgRecord {
     def identArg(existsAsync: Boolean): Term =
       if !shifted then
          term
@@ -421,6 +414,26 @@ trait ApplyArgRecordScope[F[_], CT]:
     def shift() = copy(shifted = true)
     def append(tree: CpsTree): CpsTree = tree
 
+  }
+
+
+  case class ApplyArgInlinedRecord(tree: InlinedCpsTree, nested: ApplyArgRecord )
+     extends ApplyArgRecord {
+       def index: Int = nested.index
+       def term: Term =
+              Inlined(tree.origin.call, tree.bindings, nested.term)
+       def hasShiftedLambda: Boolean = nested.hasShiftedLambda
+       def isAsync: Boolean = nested.isAsync
+       def noOrderDepended = nested.noOrderDepended
+       def identArg(existsAsync:Boolean): Term = nested.identArg(existsAsync)
+       def shift(): ApplyArgRecord = copy(nested=nested.shift())
+       def append(a: CpsTree): CpsTree =
+             val na = nested.append(a)
+             if (na eq a)
+                a
+             else
+                InlinedCpsTree(tree.origin, tree.bindings, na)
+  }
 
 
   def termIsNoOrderDepended(x:Term): Boolean =

@@ -11,8 +11,7 @@ import scala.language.implicitConversions
 import scala.quoted._
 import scala.util.Success
 
-import cps.monads.FutureAsyncMonad
-import cps.monads.FutureAsyncMonad.ImplicitAwait
+import cps.monads.given
 
 
 class TestImplicitAwait:
@@ -29,12 +28,12 @@ class TestImplicitAwait:
   
 
   @Test def withImplicitAwait(): Unit = 
-     ///implicit val printCode = cps.macroFlags.PrintCode
+     import cps.automaticColoring.{*,given}
+     //implicit val printCode = cps.macroFlags.PrintCode
      //implicit val printTree = cps.macroFlags.PrintTree
-     //implicit val debugLevel = cps.macroFlags.DebugLevel(10)
+     //implicit val debugLevel = cps.macroFlags.DebugLevel(20)
      val api = ApiEmulator
      val c = async[Future]{ 
-        import cps.features.implicitAwait.given
         val url = "http://www.example.com"
         val data = api.fetchUrl("http://www.example.com")
         val theme = api.classifyText(data)
@@ -43,6 +42,7 @@ class TestImplicitAwait:
      }
      val r = Await.result(c, 10 seconds)
      assert(r=="http://www.example.com:0:1")
+
 
 
   @Test def withExplicitAwait(): Unit = 
@@ -58,5 +58,6 @@ class TestImplicitAwait:
      }
      val r = Await.result(c, 10 seconds)
      assert(r=="http://www.example.com:0:1")
+
 
 

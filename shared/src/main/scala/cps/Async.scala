@@ -1,7 +1,7 @@
 /*
  * dotty-cps-async: https://github.com/rssh/dotty-cps-async
  *
- * (C) Ruslan Shevchenko <ruslan@shevchenko.kiev.ua>, Kyiv, 2020
+ * (C) Ruslan Shevchenko <ruslan@shevchenko.kiev.ua>, Kyiv, 2020, 2021
  */
 package cps
 
@@ -16,7 +16,7 @@ import cps.misc._
 
 
 @compileTimeOnly("await should be inside async block")
-def await[F[_],T](f:F[T])(using am:CpsMonad[F]):T = ???
+def await[F[_],T](f: F[T])(using am:CpsMonad[F]): T = ???
 
 
 inline def async[F[_]](using inline am: CpsMonad[F]): Async.InferAsyncArg[F] =
@@ -34,7 +34,7 @@ object Async {
   inline def async[F[_]](using am:CpsMonad[F]): InferAsyncArg[F] =
           new InferAsyncArg[F]
 
-  transparent inline def transform[F[_], T](inline expr: T)(using inline m: CpsMonad[F]) =
+  transparent inline def transform[F[_], T](inline expr: T)(using m: CpsMonad[F]) =
     ${
         Async.transformImpl[F,T]('expr)
      }
@@ -48,7 +48,8 @@ object Async {
        case Some(dm) =>
           transformMonad[F,T](f,dm)
        case None =>
-          report.throwError(s"Can't find async monad for ${TypeRepr.of[F].show}", f)
+          val msg = s"Can't find async monad for ${TypeRepr.of[F].show} (transformImpl)"
+          report.throwError(msg, f)
 
 
   /**
@@ -58,19 +59,31 @@ object Async {
   def transformMonad[F[_]:Type,T:Type](f: Expr[T], dm: Expr[CpsMonad[F]])(using Quotes): Expr[F[T]] = 
     import quotes.reflect._
     import TransformationContextMarker._
-    val flags = adoptFlags(f)
+    val flags = adoptFlags(f, dm)
     try
-      if (flags.printCode)
-        println(s"before transformed: ${f.show}")
+      if flags.printCode then
+        try
+           println(s"before transformed: ${f.show}")
+        catch
+           case ex: Exception =>
+              println(s"before transformed: show failed for $f, use printTree to show plain tree")
       if (flags.printTree)
         println(s"value: ${f.asTerm}")
       if (flags.debugLevel > 5) 
-        println(s"customValueDiscard=${flags.customValueDiscard}, warnValueDiscard=${flags.warnValueDiscard}")
-      val r = rootTransform[F,T](f,dm,flags,TopLevel,0, None).transformed
+        println(s"customValueDiscard=${flags.customValueDiscard}, warnValueDiscard=${flags.warnValueDiscard}, automaticColoring=${flags.automaticColoring}")
+      val memoization: Option[TransformationContext.Memoization[F]] = 
+        if flags.automaticColoring then
+          Some(resolveMemoization[F,T](f,dm))
+        else None
+      val r = rootTransform[F,T](f,dm,memoization,flags,TopLevel,0, None).transformed
       if (flags.printCode)
-        println(s"transformed value: ${r.show}")
-        if (flags.printTree)
-          println(s"transformed tree: ${r.asTerm}")
+        try
+           println(s"transformed value: ${r.show}")
+        catch
+           case ex: Exception =>
+              println(s"after transformed: show failed for $r, use printTree to show plain tree")
+      if (flags.printTree)
+        println(s"transformed tree: ${r.asTerm}")
       r
     catch
       case ex: MacroError =>
@@ -79,7 +92,7 @@ object Async {
         report.throwError(ex.msg, ex.posExpr)
 
 
-  def adoptFlags(f: Expr[_])(using Quotes): AsyncMacroFlags =
+  def adoptFlags[F[_]:Type,T](f: Expr[T], dm: Expr[CpsMonad[F]])(using Quotes): AsyncMacroFlags =
     import quotes.reflect._
     /*
     Expr.summon[AsyncMacroFlags] match
@@ -101,13 +114,39 @@ object Async {
                       case other  =>
                           throw MacroError(s"DebugLevel ${other.show} is not a compile-time value", other)
                  case None => 0
-            val customValueDiscard = Expr.summon[cps.features.CustomValueDiscardTag].isDefined
-            val warnValueDiscard = Expr.summon[cps.features.WarnValueDiscardTag].isDefined
-            AsyncMacroFlags(printCode,printTree,debugLevel, true, customValueDiscard, warnValueDiscard)
+            val automaticColoring = Expr.summon[cps.automaticColoring.AutomaticColoringTag].isDefined
+            val customValueDiscard = Expr.summon[cps.customValueDiscard.Tag].isDefined || automaticColoring
+            val warnValueDiscard = Expr.summon[cps.warnValueDiscard.Tag].isDefined || 
+                                     (automaticColoring && 
+                                      Expr.summon[cps.automaticColoring.WarnValueDiscard[F]].isDefined )
+            AsyncMacroFlags(printCode,printTree,debugLevel, true, customValueDiscard, warnValueDiscard, automaticColoring)
 
 
+  def resolveMemoization[F[_]:Type, T:Type](f: Expr[T], dm: Expr[CpsMonad[F]])(using Quotes): 
+                                                                  TransformationContext.Memoization[F] =
+     import cps.automaticColoring.{given,*}
+     import quotes.reflect._
+     Expr.summon[CpsMonadMemoization[F]] match
+       case Some(mm) =>
+             val mmtp = mm.asTerm.tpe
+             if (mmtp <:< TypeRepr.of[CpsMonadDefaultMemoization[F]]) then
+                TransformationContext.Memoization[F](MonadMemoizationKind.BY_DEFAULT, mm )
+             else if (mmtp <:< TypeRepr.of[CpsMonadInplaceMemoization[F]]) then
+                TransformationContext.Memoization[F](MonadMemoizationKind.INPLACE, mm )
+             else if (mmtp <:< TypeRepr.of[CpsMonadPureMemoization[F]]) then
+                TransformationContext.Memoization[F](MonadMemoizationKind.PURE, mm )
+             else if (mmtp <:< TypeRepr.of[CpsMonadDynamicMemoization[F]]) then
+                TransformationContext.Memoization[F](MonadMemoizationKind.DYNAMIC, mm )
+             else
+                throw MacroError(s"Can't extract memoization kind from ${mm.show} for ${TypeRepr.of[F].show}", mm)
+       case None =>
+             throw MacroError(s"Can't resolve CpsMonadMemoization for ${TypeRepr.of[F].show}", f)
+             
+                
 
-  def rootTransform[F[_]:Type,T:Type](f: Expr[T], dm:Expr[CpsMonad[F]],
+
+  def rootTransform[F[_]:Type,T:Type](f: Expr[T], dm:Expr[CpsMonad[F]], 
+                                      optMemoization: Option[TransformationContext.Memoization[F]],
                                       flags: AsyncMacroFlags,
                                       exprMarker: TransformationContextMarker, 
                                       nesting: Int,
@@ -115,7 +154,7 @@ object Async {
                                            using Quotes): CpsExpr[F,T] =
      val tType = summon[Type[T]]
      import quotes.reflect._
-     val cpsCtx = TransformationContext[F,T](f,tType,dm,flags,exprMarker,nesting,parent)
+     val cpsCtx = TransformationContext[F,T](f,tType,dm,optMemoization, flags,exprMarker,nesting,parent)
      f match 
          case '{ if ($cond)  $ifTrue  else $ifFalse } =>
                             IfTransform.run(cpsCtx, cond, ifTrue, ifFalse)
@@ -142,25 +181,27 @@ object Async {
                    IdentTransform(cpsCtx).run(name)
                 case Typed(expr, tp) =>
                    TypedTransform(cpsCtx).run(expr,tp)
-                case Try(body, cases, finalizer) =>
-                   TryTransform(cpsCtx).run(body,cases,finalizer)
+                case tryTerm@Try(body, cases, finalizer) =>
+                   TryTransform(cpsCtx).run(tryTerm,body,cases,finalizer)
                 case New(typeTree) =>
                    NewTransform(cpsCtx).run(typeTree)
                 case thisTerm@This(qual) =>
                    ThisTransform(cpsCtx).run(thisTerm)
                 case matchTerm@Match(scrutinee, caseDefs) =>
                    MatchTreeTransform.run(cpsCtx, matchTerm)
+                case selectOuterTerm: SelectOuter =>
+                   SelectOuterTreeTransform.run(cpsCtx, selectOuterTerm)
                 case selectTerm: Select =>
                    SelectTreeTransform.run(cpsCtx, selectTerm)
                 //   SelectOuter ? //TreeTransform.run(cpsCtx, selectTerm)
                 case inlinedTerm@ Inlined(call,bindings,body) =>
-                   InlinedTransform(cpsCtx).run(inlinedTerm)
+                   InlinedTreeTransform.run(cpsCtx,inlinedTerm)
                 case superTerm@Super(qual,mix) =>
                    SuperTransform(cpsCtx).run(superTerm)
                 case returnTerm@Return(expr, from)=>
                    ReturnTransform(cpsCtx).run(returnTerm, from)
                 case constTerm@Literal(_)=>  
-                   ConstTransform(cpsCtx)
+                   ConstTransform.run(cpsCtx, constTerm)
                 case repeatedTerm@Repeated(elems, tpt) =>  
                    RepeatedTransform(cpsCtx).run(repeatedTerm)
                 case _ =>
@@ -173,7 +214,7 @@ object Async {
   def nestTransform[F[_]:Type,T:Type,S:Type](f:Expr[S], 
                               cpsCtx: TransformationContext[F,T], 
                               marker: TransformationContextMarker)(using Quotes):CpsExpr[F,S]=
-        rootTransform(f,cpsCtx.monad,
+        rootTransform(f,cpsCtx.monad, cpsCtx.memoization,
                       cpsCtx.flags,marker,cpsCtx.nesting+1, Some(cpsCtx))
 
 
